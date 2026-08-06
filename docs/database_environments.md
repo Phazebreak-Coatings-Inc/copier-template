@@ -69,7 +69,7 @@ TF_WORKSPACE="Your project name here"
 
 ### Setting Up ```prod``` and ```staging```
 
-First, we'll want to create a Personal Access Token for Digital Ocean. Please visit the following documentation for steps to retrieve it: ```https://docs.digitalocean.com/reference/api/create-personal-access-token/```.
+First, we'll want to create a Personal Access Token for Digital Ocean. Please visit the following documentation for steps to retrieve it [here](https://docs.digitalocean.com/reference/api/create-personal-access-token/).
 
 Once you have your token, create and open your env file at ```./.env```:
 
@@ -187,8 +187,54 @@ The database cluster can up to 10 minutes to provision. Don't cancel the current
 
 If you want to destroy your infrastructure, run ```uv run --env-file .env python -m environments down prod --destroy```.
 
+## Applying Migrations
+
+If you want to apply a migration to prod or staging there are two methods:
+
+### Manually
+
+We'll use ```migrations``` to apply a migration to a specific environment.
+
+```uv run --env-file .env python -m migrations apply prod```
+
+The following output:
+
+```
+Upgrade prod to head? [y/N]: y
+Imported 'models' successfully.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DD
+L.
+```
+
+### Via ```--startup```
+
+We can use the ```--startup``` flag to call startup steps on whichever environment we want.
+
+```uv run --env-file .env python -m environments up --startup```
+
+!!! Warning
+    
+    This will also seed the database, and run whatever other startup steps there are.
+
+```
+Database 'prod' is already up.
+Running startup steps... [1/3]
+Ensured grant on schema public to prod_user
+Running startup steps... [2/3]
+Imported 'models' successfully.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DD
+L.
+Running startup steps... [3/3]
+Found 0 seeds for environment 'prod'...
+Completed 3 steps successfully.
+```
+
 
 ## Accessing The Databases
+
+### Accessing via Python
 
 If you'd like to access your infrastructure in python, do the following:
 
@@ -198,11 +244,11 @@ from database_core import get_database_setting
 engine = get_database_setting("prod").engine
 ```
 
-The object is ```SQLAlchemy```'s ```Engine``` object.
+```engine``` provides ```SQLAlchemy```'s ```Engine``` object.
 
-If you'd like to access a different engine, replace ```"prod"``` with either ```"dev"``` or ```"staging"```
+If you'd like to access a different engine, replace ```"prod"``` with either ```"dev"``` or ```"staging"```.
 
-You can even set which environment is running with environment variables.
+You can even set which environment is running with environment variables:
 
 ```python
 import os
@@ -213,3 +259,57 @@ engine = get_database_setting(env).engine
 ```
 
 ```get_database_setting()``` automatically validates with ```pydantic```, so if you put an invalid value, there's nothing to worry about.
+
+### Querying via CLI
+
+If you want to query a database environment directly, use the following:
+
+```uv run --env-file .env python -m environments exec```
+
+We can either feed the command SQL or the name of a ```.sql``` file.
+
+For example, let's run a simple query:
+
+```sql
+SELECT 1
+```
+
+```
+uv run --env-file .env python -m environments exec dev --sql "SELECT 1"
+```
+
+The output:
+
+```
+{'?column?': 1}
+1 row(s)
+```
+
+We can do the same thing by making a ```.sql``` file called ```select.sql``` and putting ```SELECT 1``` there.
+
+```
+uv run --env-file .env python -m environments exec dev --file "./select.sql"
+```
+
+The output, again:
+
+```
+{'?column?': 1}
+1 row(s)
+```
+
+You can also run this on the ```staging``` and ```prod``` environments, but they will ask you to confirm your execution:
+
+```
+uv run --env-file .env python -m environments exec prod --file "./select.sql"
+```
+
+```
+Run against 'prod'?
+
+SELECT 1;
+
+ [y/N]: y
+{'?column?': 1}
+1 rows(s)
+```

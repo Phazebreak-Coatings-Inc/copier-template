@@ -36,7 +36,7 @@ uv run python -m migrations --help
 
 Create your first model at ```./models/src/models/my_model.py```:
 
-!!! Note
+!!! Warning
 
     The best way to create models is documented [here](model_generation.md). This quickstart is just to demonstrate the capability of migration without needing your existing database to be up, or to write commands inside of your ```docker``` container.
 

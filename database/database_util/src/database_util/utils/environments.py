@@ -24,6 +24,7 @@ from pydantic import (
     BaseModel,
     SecretStr,
     model_validator,
+    PrivateAttr
 )
 from functools import cached_property
 from pydantic_settings import BaseSettings
@@ -174,6 +175,7 @@ class TerraformedDatabaseSettings[OutputsShape: Mapping = Mapping](
     BaseDatabaseSettings
 ):
     __cwd__: ClassVar[Path | None] = None
+    _outputs_cache: dict[str, TerraformOutput] | None = PrivateAttr(default=None)
 
     @classmethod
     def set_cwd(cls, p: Path) -> None:
@@ -212,6 +214,7 @@ class TerraformedDatabaseSettings[OutputsShape: Mapping = Mapping](
             self.tf("apply main.tfplan")
         finally:
             self.plan_file.unlink(missing_ok=True)
+            self._outputs_cache = None
 
     def test(self) -> bool:
         try:
@@ -241,10 +244,17 @@ class TerraformedDatabaseSettings[OutputsShape: Mapping = Mapping](
 
     @property
     def outputs(self) -> dict[str, TerraformOutput]:
-        r = self.tf("output -json -no-color", check=False, silent=True)
-        if r.returncode != 0 or not (r.stdout or "").strip():
-            return {}
-        return {k: TerraformOutput.model_validate(v) for k, v in json.loads(r.stdout).items()}
+        if self._outputs_cache is None:
+            r = self.tf("output -json -no-color", check=False, silent=True)
+            self._outputs_cache = (
+                {}
+                if r.returncode != 0 or not (r.stdout or "").strip()
+                else {
+                    k: TerraformOutput.model_validate(v)
+                    for k, v in json.loads(r.stdout).items()
+                }
+            )
+        return self._outputs_cache
 
     def get_output(self, key: str) -> Any:
         outputs = self.outputs
