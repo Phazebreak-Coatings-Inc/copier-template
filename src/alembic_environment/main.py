@@ -15,7 +15,13 @@ COPIER_REPO = "gh:Phazebreak-Coatings-Inc/alembic-environment"
 
 ANSWERS_FILE = ".alembic-environment-answers.yml"
 
-WORKSPACES = ["models", "migrations"]
+WORKSPACE = {
+    "database_core": "database/database_core",
+    "database_util": "database/database_util",
+    "models": "database/models",
+    "migrations": "database/migrations",
+    "environments": "database/environments",
+}
 
 PACKAGES = [
     "alembic>=1.18.4",
@@ -54,7 +60,7 @@ def get_pyproject(cwd: Path) -> tomlkit.TOMLDocument:
     return tomlkit.parse(p.read_text())
 
 
-def add_workspaces(p: PyProject, members: WorkspaceMembers) -> PyProject:
+def add_workspaces(p: PyProject, workspace: dict[str, str]) -> PyProject:
     def sd(t, name):
         return t.setdefault(name, tomlkit.table())
 
@@ -63,17 +69,16 @@ def add_workspaces(p: PyProject, members: WorkspaceMembers) -> PyProject:
     ext = list(ws.get("members", []))
 
     arr = tomlkit.array()
-    for m in ext + [m for m in members if m not in ext]:
+    for m in ext + [m for m in workspace.values() if m not in ext]:  # paths
         arr.append(m)
     ws["members"] = arr
 
     sources = sd(uv, "sources")
-    for m in members:
-        if m not in sources:
+    for name in workspace:  # names
+        if name not in sources:
             it = tomlkit.inline_table()
             it["workspace"] = True
-            sources[m] = it
-
+            sources[name] = it
     return p
 
 
@@ -130,10 +135,18 @@ def repair(
         str, typer.Argument(help="Directory to initialize project in.")
     ] = ".",
 ):
-    print("Syncing dependencies and workspaces ...")
     p = Path(cwd).resolve()
-    write_pyproject(p, add_workspaces(get_pyproject(p), WORKSPACES))
-    sh("uv sync")
-    sh(f"uv add --workspace {' '.join(WORKSPACES)}")
-    sh(f"uv add {' '.join(PACKAGES)}")
-    print("Repair completed successfully.")
+    for name, member in WORKSPACE.items():
+        if not (p / member / "pyproject.toml").exists():
+            typer.secho(
+                f"member {member!r} ({name}) has no pyproject.toml",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(1)
+    write_pyproject(p, add_workspaces(get_pyproject(p), WORKSPACE))
+    sh(f"uv add --workspace {' '.join(WORKSPACE)}", cwd=p)
+    sh(
+        f"uv add --dev {' '.join(PACKAGES)}", cwd=p
+    ) 
+    sh("uv sync", cwd=p)

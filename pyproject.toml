@@ -1,12 +1,11 @@
 [project]
 name = "alembic-environment"
-version = "0.1.5"
+version = "0.1.6"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "copier>=9.15.1",
-    "tomlkit>=0.15.0",
     "typer>=0.26.6",
 ]
 
@@ -23,20 +22,33 @@ requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 
 [tool.uv.workspace]
-members = ["models", "migrations"]
+members = [
+    "database/models",
+    "database/migrations",
+    "database/environments",
+    "database/database_util",
+    "database/database_core",
+]
 
 [tool.uv.sources]
+database_util = { workspace = true }
+database_core = { workspace = true }
 models = { workspace = true }
 migrations = { workspace = true }
+environments = { workspace = true }
 
 [dependency-groups]
 dev = [
+    "skylos>=4.29.0",
     "debugpy>=1.8.21",
     "alembic>=1.18.4",
     "sqlalchemy>=2.0.50",
     "sqlmodel>=0.0.38",
     "models",
     "migrations",
+    "environments",
+    "database_util",
+    "database_core",
     "pytest-alembic>=0.12.1",
     "pytest>=9.0.3",
     "pydantic-settings>=2.14.1",
@@ -45,8 +57,9 @@ dev = [
     "tomlkit>=0.15.0",
     "sqlacodegen>=4.0.3",
     "inflection>=0.5.1",
-    "models",
-    "migrations"
+    "copier>=9.15.1",
+    "typer>=0.26.6",
+    "sqlglot>=30.12.0",
 ]
 
 docs = [

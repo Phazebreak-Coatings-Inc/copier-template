@@ -1,0 +1,10 @@
+[project]
+name = "database_core"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14.5"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.18,<0.12"]
+build-backend = "uv_build"
