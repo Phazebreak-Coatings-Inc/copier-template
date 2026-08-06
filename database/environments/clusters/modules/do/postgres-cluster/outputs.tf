@@ -17,3 +17,12 @@ output "port" {
 output "urn" {
   value = digitalocean_database_cluster.alembic_environment_database_cluster.urn
 }
+
+output "admin_username" {
+  value = digitalocean_database_cluster.alembic_environment_database_cluster.user
+}
+
+output "admin_password" {
+  sensitive = true
+  value     = digitalocean_database_cluster.alembic_environment_database_cluster.password
+}

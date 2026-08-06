@@ -32,3 +32,12 @@ output "staging_password" {
 output "staging_name" {
   value = module.staging_database.db_name
 }
+
+output "admin_username" {
+  value = module.cluster.admin_username
+}
+
+output "admin_password" {
+  sensitive = true
+  value     = module.cluster.admin_password
+}

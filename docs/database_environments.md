@@ -83,5 +83,133 @@ Once you have listed your token under ```TF_VAR_do_token```, go ahead and terraf
 uv run --env-file .env python -m environments up prod
 ```
 
+It will alert us that we're successfully connected to the cloud:
+
+```
+HCP Terraform has been successfully initialized!
+```
+
+It will also alert us to the following resources that will be created:
+
+```
+Terraform will perform the following actions:
+
+  # module.cluster.digitalocean_database_cluster.alembic_environment_
+database_cluster will be created
+  + resource "digitalocean_database_cluster" "alembic_environment_dat
+abase_cluster" {
+      + database             = (known after apply)
+      + engine               = "pg"
+      + host                 = (known after apply)
+      + id                   = (known after apply)
+      + metrics_endpoints    = (known after apply)
+      + name                 = "alembic-environment"
+      + node_count           = 2
+      + password             = (sensitive value)
+      + port                 = (known after apply)
+      + private_host         = (known after apply)
+      + private_network_uuid = (known after apply)
+      + private_uri          = (sensitive value)
+      + project_id           = (known after apply)
+      + region               = "nyc1"
+      + size                 = "db-s-2vcpu-4gb"
+      + storage_size_mib     = (known after apply)
+      + ui_database          = (known after apply)
+      + ui_host              = (known after apply)
+      + ui_password          = (sensitive value)
+      + ui_port              = (known after apply)
+      + ui_uri               = (sensitive value)
+      + ui_user              = (known after apply)
+      + uri                  = (sensitive value)
+      + urn                  = (known after apply)
+      + user                 = (known after apply)
+      + version              = "18"
+    }
+
+  # module.prod_database.digitalocean_database_db.alembic_environment
+_database will be created
+  + resource "digitalocean_database_db" "alembic_environment_database
+" {
+      + cluster_id = (known after apply)
+      + id         = (known after apply)
+      + name       = "prod"
+    }
+
+  # module.prod_database.digitalocean_database_user.alembic_environme
+nt_database_user will be created
+  + resource "digitalocean_database_user" "alembic_environment_databa
+se_user" {
+      + access_cert = (sensitive value)
+      + access_key  = (sensitive value)
+      + cluster_id  = (known after apply)
+      + id          = (known after apply)
+      + name        = "prod_user"
+      + password    = (sensitive value)
+      + role        = (known after apply)
+    }
+
+  # module.staging_database.digitalocean_database_db.alembic_environm
+ent_database will be created
+  + resource "digitalocean_database_db" "alembic_environment_database
+" {
+      + cluster_id = (known after apply)
+      + id         = (known after apply)
+      + name       = "staging"
+    }
+
+  # module.staging_database.digitalocean_database_user.alembic_enviro
+nment_database_user will be created
+  + resource "digitalocean_database_user" "alembic_environment_databa
+se_user" {
+      + access_cert = (sensitive value)
+      + access_key  = (sensitive value)
+      + cluster_id  = (known after apply)
+      + id          = (known after apply)
+      + name        = "staging_user"
+      + password    = (sensitive value)
+      + role        = (known after apply)
+    }
+
+Plan: 5 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + database_host    = (known after apply)
+  + database_port    = (known after apply)
+  + prod_name        = "prod"
+  + prod_password    = (sensitive value)
+  + prod_username    = "prod_user"
+  + staging_name     = "staging"
+  + staging_password = (sensitive value)
+  + staging_username = "staging_user"
+```
+
+The database cluster can up to 10 minutes to provision. Don't cancel the current command.
+
+If you want to destroy your infrastructure, run ```uv run --env-file .env python -m environments down prod --destroy```.
 
 
+## Accessing The Databases
+
+If you'd like to access your infrastructure in python, do the following:
+
+```python
+from database_core import get_database_setting
+
+engine = get_database_setting("prod").engine
+```
+
+The object is ```SQLAlchemy```'s ```Engine``` object.
+
+If you'd like to access a different engine, replace ```"prod"``` with either ```"dev"``` or ```"staging"```
+
+You can even set which environment is running with environment variables.
+
+```python
+import os
+from database_core import get_database_setting
+
+env = os.environ.get("ENVIRONMENT")
+engine = get_database_setting(env).engine
+```
+
+```get_database_setting()``` automatically validates with ```pydantic```, so if you put an invalid value, there's nothing to worry about.

@@ -27,7 +27,7 @@ from pydantic import (
 )
 from functools import cached_property
 from pydantic_settings import BaseSettings
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, URL
 from .paths import (
     ENV_DEV_COMPOSE,
     PKG_PROD,
@@ -156,6 +156,7 @@ class BaseDatabaseSettings(ABC, BaseSettings):
         finally:
             self.down()
 
+class TerraformOutputError(Exception): ...
 
 class TerraformOutput(BaseModel):
     value: str | int | SecretStr
@@ -197,17 +198,9 @@ class TerraformedDatabaseSettings[OutputsShape: Mapping = Mapping](
     def planned(self) -> bool:
         return self.plan_file.exists()
 
-    def tf(self, cmd: str, **kwargs) -> subprocess.CompletedProcess:
+    def tf(self, cmd: str, check: bool = True, silent: bool = False, **kwargs):
         from .typer_utils import sh
-
-        return sh(
-            f"terraform {cmd}",
-            cwd=self.get_cwd(),
-            check=True,
-            silent=False,
-            text=True,
-            **kwargs,
-        )
+        return sh(f"terraform {cmd}", cwd=self.get_cwd(), check=check, silent=silent, text=True, **kwargs)
 
     def plan(self) -> subprocess.CompletedProcess:
         self.tf("init")
@@ -246,35 +239,91 @@ class TerraformedDatabaseSettings[OutputsShape: Mapping = Mapping](
         )
         return self.tf("destroy")
 
-    @cached_property
+    @property
     def outputs(self) -> dict[str, TerraformOutput]:
-        result = self.tf("output -json -no-color", capture_output=True)
-        return {
-            k: TerraformOutput.model_validate(v)
-            for k, v in json.loads(result.stdout).items()
-        }
+        r = self.tf("output -json -no-color", check=False, silent=True)
+        if r.returncode != 0 or not (r.stdout or "").strip():
+            return {}
+        return {k: TerraformOutput.model_validate(v) for k, v in json.loads(r.stdout).items()}
 
     def get_output(self, key: str) -> Any:
-        out = self.outputs[key]
+        outputs = self.outputs
+        if key not in outputs:
+            available = json.dumps(
+                {
+                    k: "**********" if isinstance(v.value, SecretStr) else v.value
+                    for k, v in outputs.items()
+                },
+                indent=2,
+            )
+            raise TerraformOutputError(
+                f"No terraform output '{key}' for '{self.get_environment_str()}'. "
+                f"Available: {available or '(none - has this environment been applied?)'}"
+            )
+        out = outputs[key]
         return (
-            out.value.get_secret_value()
-            if isinstance(out.value, SecretStr)
-            else out.value
+            out.value.get_secret_value() if isinstance(out.value, SecretStr) else out.value
         )
 
     @abstractmethod
     def map_outputs(self) -> None: ...
 
+    def create_database_url(self, username: str, password: str) -> URL:
+        return URL.create(
+            "postgresql+psycopg",
+            username=username,
+            password=password,
+            host=self.database_host,
+            port=self.database_port,
+            database=self.database_name,
+        )
+
     @property
     def database_url(self) -> str:
         self.map_outputs()
-        return (
-            f"postgresql+psycopg://{self.database_username}:{self.database_password}"
-            f"@{self.database_host}:{self.database_port}/{self.database_name}"
+        u = self.database_username
+        p = self.database_password
+        if u is None or p is None:
+            raise ValueError("Expected database_user and database_password")
+        return self.create_database_url(u, p).render_as_string(hide_password=False) 
+
+    @property
+    def admin_engine(self):
+        from sqlalchemy import create_engine
+
+        self.map_outputs()
+        return create_engine(
+            self.create_database_url(
+                self.get_output("admin_username"), self.get_output("admin_password")
+            ),
+            connect_args={"connect_timeout": 3},
         )
+
+    def grant(self) -> None:
+        self.map_outputs()
+        admin = URL.create(
+            "postgresql+psycopg",
+            username=self.get_output("admin_username"),
+            password=self.get_output("admin_password"),
+            host=self.database_host,
+            port=self.database_port,
+            database=self.database_name,
+        )
+        with create_engine(admin).begin() as c:
+            c.exec_driver_sql(f'GRANT ALL ON SCHEMA public TO "{self.database_username}"')
+        typer.secho(f"Ensured grant on schema public to {self.database_username}", fg=typer.colors.GREEN)
 
     def temp(self) -> None:
         raise Exception("Can't spin up 'temp' for a terraformed database")
+
+    def up_steps(self) -> list[Callable]:
+        return [
+            self.grant,
+            self.upgrade,
+            self.seed,
+        ]
+
+
 
 
 class MigrationSettings(BaseDatabaseSettings):
