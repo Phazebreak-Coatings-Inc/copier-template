@@ -11,40 +11,32 @@ type PyProject = tomlkit.TOMLDocument
 
 type WorkspaceMembers = list[str]
 
-COPIER_REPO = "gh:Phazebreak-Coatings-Inc/alembic-environment"
+import shutil
+import tempfile
 
-ANSWERS_FILE = ".alembic-environment-answers.yml"
-
-WORKSPACE = {
-    "database_core": "database/database_core",
-    "database_util": "database/database_util",
-    "models": "database/models",
-    "migrations": "database/migrations",
-    "environments": "database/environments",
-}
-
-PACKAGES = [
-    "alembic>=1.18.4",
-    "copier>=9.15.1",
-    "sqlalchemy>=2.0.50",
-    "sqlmodel>=0.0.38",
-    "typer>=0.26.6",
-    "pytest-alembic>=0.12.1",
-    "pytest>=9.0.3",
-    "pydantic-settings>=2.14.1",
-    "psycopg[binary]>=3.3.4",
-    "ruff>=0.15.15",
-    "tomlkit>=0.15.0",
-    "sqlacodegen>=4.0.3",
-    "inflection>=0.5.1",
-]
+from .config import (
+    ANSWERS_FILE,
+    COPIER_REPO,
+    EXAMPLE_NAME,
+    EXAMPLE_PROJECT_NAME,
+    PACKAGES,
+    SCRIPTS,
+    WORKSPACE,
+)
 
 
-def sh(cmd: str, check=True, **kwargs):
+def sh(cmd: str, silent=False, check=True, **kwargs) -> subprocess.CompletedProcess:
+    if silent:
+        kwargs.setdefault("stdout", subprocess.PIPE)
+        kwargs.setdefault("stderr", subprocess.PIPE)
+        kwargs.setdefault("text", True)
     try:
-        subprocess.run(cmd, shell=True, check=check, **kwargs)
+        return subprocess.run(cmd, shell=True, check=check, **kwargs)
     except subprocess.CalledProcessError as e:
-        typer.secho(f"failed: {cmd}", fg=typer.colors.RED, err=True)
+        if not silent:
+            typer.secho(f"\nFailed: {cmd}", fg=typer.colors.BRIGHT_RED, err=True)
+            if output := (e.stderr or e.stdout):
+                typer.secho(output.rstrip(), fg=typer.colors.RED, err=True)
         raise typer.Exit(e.returncode) from None
 
 
@@ -69,16 +61,26 @@ def add_workspaces(p: PyProject, workspace: dict[str, str]) -> PyProject:
     ext = list(ws.get("members", []))
 
     arr = tomlkit.array()
-    for m in ext + [m for m in workspace.values() if m not in ext]:  # paths
+    for m in ext + [m for m in workspace.values() if m not in ext]:
         arr.append(m)
     ws["members"] = arr
 
     sources = sd(uv, "sources")
-    for name in workspace:  # names
+    for name in workspace:
         if name not in sources:
             it = tomlkit.inline_table()
             it["workspace"] = True
             sources[name] = it
+    return p
+
+
+def add_scripts(p: PyProject, scripts: dict[str, str]) -> PyProject:
+    def sd(t, name):
+        return t.setdefault(name, tomlkit.table())
+
+    table = sd(sd(p, "project"), "scripts")
+    for name, target in scripts.items():
+        table[name] = target
     return p
 
 
@@ -144,9 +146,49 @@ def repair(
                 err=True,
             )
             raise typer.Exit(1)
-    write_pyproject(p, add_workspaces(get_pyproject(p), WORKSPACE))
+    write_pyproject(p, add_scripts(add_workspaces(get_pyproject(p), WORKSPACE), SCRIPTS))
     sh(f"uv add --workspace {' '.join(WORKSPACE)}", cwd=p)
-    sh(
-        f"uv add --dev {' '.join(PACKAGES)}", cwd=p
-    ) 
+    sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=p)
     sh("uv sync", cwd=p)
+
+
+EXAMPLE_PYPROJECT = f"""\
+[project]
+name = "{EXAMPLE_PROJECT_NAME}"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.18,<0.12"]
+build-backend = "uv_build"
+"""
+
+
+@app.command(help="Destroy and regenerate the committed example project.")
+def example():
+    root = Path.cwd().resolve()
+    if not (root / "copier.yml").exists():
+        typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    dst = root / EXAMPLE_NAME
+    if dst.exists():
+        shutil.rmtree(dst)
+    dst.mkdir()
+    (dst / "pyproject.toml").write_text(EXAMPLE_PYPROJECT)
+    pkg = dst / "src" / EXAMPLE_PROJECT_NAME.replace("-", "_")
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").touch()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "template"
+        shutil.copytree(root, src, ignore=shutil.ignore_patterns(".git", ".venv"))
+        copier.run_copy(str(src), str(dst), defaults=True, unsafe=True, quiet=False)
+
+    (dst / ANSWERS_FILE).unlink(missing_ok=True)
+    repair(str(dst))
+    sh("uv build --all-packages", cwd=dst)
+    sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
+    sh("uv run pytest", cwd=dst)
+    typer.secho(f"Regenerated {dst}", fg=typer.colors.GREEN)

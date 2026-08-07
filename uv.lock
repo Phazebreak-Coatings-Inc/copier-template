@@ -28,7 +28,7 @@ wheels = [
 
 [[package]]
 name = "alembic-environment"
-version = "0.2.1"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "copier" },
@@ -372,11 +372,45 @@ wheels = [
 name = "database-core"
 version = "0.1.0"
 source = { editable = "database/database_core" }
+dependencies = [
+    { name = "database-util" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "database-util", editable = "database/database_util" }]
 
 [[package]]
 name = "database-util"
 version = "0.1.0"
 source = { editable = "database/database_util" }
+dependencies = [
+    { name = "alembic" },
+    { name = "inflection" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "rich" },
+    { name = "sqlacodegen" },
+    { name = "sqlalchemy" },
+    { name = "sqlglot" },
+    { name = "sqlmodel" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.18.4" },
+    { name = "inflection", specifier = ">=0.5.1" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pydantic-settings", specifier = ">=2.14.1" },
+    { name = "rich", specifier = ">=13.0" },
+    { name = "sqlacodegen", specifier = ">=4.0.3" },
+    { name = "sqlalchemy", specifier = ">=2.0.50" },
+    { name = "sqlglot", specifier = ">=25.0" },
+    { name = "sqlmodel", specifier = ">=0.0.38" },
+    { name = "typer", specifier = ">=0.26.6" },
+]
 
 [[package]]
 name = "debugpy"
@@ -429,6 +463,12 @@ wheels = [
 name = "environments"
 version = "0.1.0"
 source = { editable = "database/environments" }
+dependencies = [
+    { name = "database-util" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "database-util", editable = "database/database_util" }]
 
 [[package]]
 name = "funcy"
@@ -884,12 +924,14 @@ name = "models"
 version = "0.1.0"
 source = { editable = "database/models" }
 dependencies = [
+    { name = "database-util" },
     { name = "sqlalchemy" },
     { name = "sqlmodel" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "database-util", editable = "database/database_util" },
     { name = "sqlalchemy", specifier = ">=2.0.50" },
     { name = "sqlmodel", specifier = ">=0.0.38" },
 ]

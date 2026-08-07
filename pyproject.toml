@@ -1,6 +1,6 @@
 [project]
 name = "alembic-environment"
-version = "0.2.1"
+version = "0.2.2"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -22,6 +22,26 @@ alembic-environment = "alembic_environment.__main__:main"
 requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 
+
+[tool.pytest.ini_options]
+markers = ["slow: builds the example project", "docker: needs a running docker daemon"]
+norecursedirs = [
+    "*.egg",
+    ".*",
+    "_darcs",
+    "build",
+    "CVS",
+    "dist",
+    "node_modules",
+    "venv",
+    "{arch}",
+    "example",
+]
+testpaths = ["tests", "database"]
+
+[tool.ruff]
+exclude = ["example"]
+
 [tool.uv.workspace]
 members = [
     "database/models",
@@ -30,6 +50,7 @@ members = [
     "database/database_util",
     "database/database_core",
 ]
+exclude = ["example"]
 
 [tool.uv.sources]
 database_util = { workspace = true }

@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# example
+example/.venv/
+example/uv.lock
+
 # C extensions
 *.so
 
