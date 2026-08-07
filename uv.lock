@@ -28,10 +28,11 @@ wheels = [
 
 [[package]]
 name = "alembic-environment"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "copier" },
+    { name = "tomlkit" },
     { name = "typer" },
 ]
 
@@ -66,6 +67,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "copier", specifier = ">=9.15.1" },
+    { name = "tomlkit", specifier = ">=0.15.0" },
     { name = "typer", specifier = ">=0.26.6" },
 ]
 
