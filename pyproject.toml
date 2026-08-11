@@ -1,6 +1,6 @@
 [project]
-name = "alembic-environment"
-version = "0.2.2"
+name = "copier_template"
+version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -11,12 +11,12 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://phazebreak-coatings-inc.github.io/alembic-environment"
-Documentation = "https://phazebreak-coatings-inc.github.io/alembic-environment/"
-Repository = "https://github.com/Phazebreak-Coatings-Inc/alembic-environment"
+Homepage = ""
+Documentation = ""
+Repository = ""
 
 [project.scripts]
-alembic-environment = "alembic_environment.__main__:main"
+copier = "copier_template.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.11.18,<0.12"]
@@ -24,7 +24,6 @@ build-backend = "uv_build"
 
 
 [tool.pytest.ini_options]
-markers = ["slow: builds the example project", "docker: needs a running docker daemon"]
 norecursedirs = [
     "*.egg",
     ".*",
@@ -37,53 +36,10 @@ norecursedirs = [
     "{arch}",
     "example",
 ]
-testpaths = ["tests", "database"]
 
 [tool.ruff]
 exclude = ["example"]
 
 [tool.uv.workspace]
-members = [
-    "database/models",
-    "database/migrations",
-    "database/environments",
-    "database/database_util",
-    "database/database_core",
-]
+members = []
 exclude = ["example"]
-
-[tool.uv.sources]
-database_util = { workspace = true }
-database_core = { workspace = true }
-models = { workspace = true }
-migrations = { workspace = true }
-environments = { workspace = true }
-
-[dependency-groups]
-dev = [
-    "skylos>=4.29.0",
-    "debugpy>=1.8.21",
-    "alembic>=1.18.4",
-    "sqlalchemy>=2.0.50",
-    "sqlmodel>=0.0.38",
-    "models",
-    "migrations",
-    "environments",
-    "database_util",
-    "database_core",
-    "pytest-alembic>=0.12.1",
-    "pytest>=9.0.3",
-    "pydantic-settings>=2.14.1",
-    "psycopg[binary]>=3.3.4",
-    "ruff>=0.15.15",
-    "tomlkit>=0.15.0",
-    "sqlacodegen>=4.0.3",
-    "inflection>=0.5.1",
-    "copier>=9.15.1",
-    "typer>=0.26.6",
-    "sqlglot>=30.12.0",
-]
-
-docs = [
-    "zensical>=0.0.43"
-]

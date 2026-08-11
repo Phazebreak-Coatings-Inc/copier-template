@@ -10,19 +10,19 @@
 # The site_name is shown in the page header and the browser window title
 #
 # Read more: https://zensical.org/docs/setup/basics/#site_name
-site_name = "alembic-environment"
-repo_url = "https://github.com/Phazebreak-Coatings-Inc/alembic-environment"
-repo_name = "alembic-environment"
+site_name = "CHANGEME"
+repo_url = ""
+repo_name = "CHANGEME"
 # The site_description is included in the HTML head and should contain a
 # meaningful description of the site content for use by search engines.
 #
 # Read more: https://zensical.org/docs/setup/basics/#site_description
-site_description = "An easy template to auto-generate with alembic without a live database."
+site_description = "CHANGEME"
 
 # The site_author attribute. This is used in the HTML head element.
 #
 # Read more: https://zensical.org/docs/setup/basics/#site_author
-site_author = "Miles Copeland Luce"
+site_author = "CHANGEME"
 
 # The site_url is the canonical URL for your site. When building online
 # documentation you should set this.
@@ -34,7 +34,7 @@ site_author = "Miles Copeland Luce"
 #
 # Read more: https://zensical.org/docs/setup/basics/#copyright
 copyright = """
-Copyright &copy; 2026 Phazebreak Coatings, Inc.
+Copyright &copy; 2026 CHANGEME 
 """
 
 # Zensical supports both implicit navigation and explicitly defined navigation.
