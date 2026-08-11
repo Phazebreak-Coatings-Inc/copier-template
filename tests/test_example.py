@@ -5,7 +5,7 @@ import pytest
 import tomlkit
 import yaml
 
-from alembic_environment.config import (
+from copier_template.config import (
     EXAMPLE_NAME,
     EXAMPLE_PRESENT,
     EXAMPLE_PROJECT_NAME,

@@ -102,7 +102,7 @@ def init(
     repair(dest)
 
 
-@app.command(help="Update an existing alembic-environment project.")
+@app.command(help="Update your existing project.")
 def update(
     abort: Annotated[
         bool,

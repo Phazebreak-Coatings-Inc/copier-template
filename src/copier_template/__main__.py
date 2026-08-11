@@ -1,3 +1,3 @@
-from alembic_environment.main import app
+from copier_template.main import app
 
 app()

@@ -1,7 +1,6 @@
-_answers_file: .alembic-environment-answers.yml
+_answers_file: .copier-answers.yml
 _tasks:
-  - "uvx alembic-environment repair"
-  - "uv run migrations init"
+  - "uvx repair" #fix with your name here
 _exclude:
   - "copier.yml"
   - "/src"
@@ -19,8 +18,6 @@ _exclude:
   - "/.github/workflows/docs.yml"
   - "/.github/workflows/release.yml"
   - "/.github/workflows/dependabot.yml"
-  - "/.github/workflows/format.yml"
-  - "/.github/workflows/skylos.yml"
   - ".git"
   - ".gitignore"
   - ".venv"
@@ -48,7 +45,3 @@ _exclude:
   - "override.tf.json"
   - "*_override.tf"
   - "*_override.tf.json"
-  - "/database/environments/clusters/modules"
-  - "/database/migrations/src/migrations/versions/*.py"
-  - "/database/migrations/src/migrations/backfills/*.py"
-  - "/database/migrations/src/migrations/seeds/*.py"
