@@ -1,11 +1,12 @@
 [project]
 name = "copier_template"
 version = "0.1.0"
-description = "Add your description here"
+description = "Meta-template for creating copier projects"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "copier>=9.15.1",
+    "inflection>=0.5.1",
     "pytest>=9.1.1",
     "tomlkit>=0.15.0",
     "typer>=0.26.6",
@@ -15,9 +16,6 @@ dependencies = [
 Homepage = ""
 Documentation = ""
 Repository = ""
-
-[project.scripts]
-copier = "copier_template.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.11.18,<0.12"]
@@ -39,8 +37,8 @@ norecursedirs = [
 ]
 
 [tool.ruff]
-exclude = ["example"]
+exclude = ["example", "template"]
 
 [tool.uv.workspace]
 members = []
-exclude = ["example"]
+exclude = ["example", "template"]

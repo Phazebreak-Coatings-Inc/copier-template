@@ -1,25 +1,24 @@
+project_name:
+  type: str 
+  help: The name of your next copier-template. #If using 'uvx example, it should be example_project' TODO: hardcode this
+  default: example_project
+
+your_name:
+  type: str
+  help: Your first and last name.
+  default: Some User
+
+github_repo:
+  type: str
+  help: Your github repo in the style of 'user/repo' without https://github.com/ 
+
+_subdirectory: template
 _answers_file: .copier-answers.yml
 _tasks:
-  - "uvx repair" #fix with your name here
+  - "uv sync" #TODO: remove later
+  #- "uvx copier-template repair" 
 _exclude:
-  - "copier.yml"
-  - "/src"
-  - "/pyproject.toml"
-  - "/uv.lock"
-  - "/tests"
-  - "/example"
-  - "/docs"
-  - "/site"
-  - "/dist"
-  - "/cache"
-  - "/zensical.toml"
-  - "/LICENSE"
-  - "/README.md"
-  - "/.github/workflows/docs.yml"
-  - "/.github/workflows/release.yml"
-  - "/.github/workflows/dependabot.yml"
-  - ".git"
-  - ".gitignore"
+  - "pyproject.toml"
   - ".venv"
   - ".cache"
   - ".ruff_cache"

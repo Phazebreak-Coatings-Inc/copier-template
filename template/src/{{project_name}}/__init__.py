@@ -1,3 +1,3 @@
 from .main import app
 
-app()
+__all__ = ["app"]
