@@ -13,7 +13,6 @@ type PyProject = tomlkit.TOMLDocument
 type WorkspaceMembers = list[str]
 
 import shutil
-import tempfile
 
 from .config import (
     ANSWERS_FILE,
@@ -40,6 +39,7 @@ def sh(cmd: str, silent=False, check=True, **kwargs) -> subprocess.CompletedProc
                 typer.secho(output.rstrip(), fg=typer.colors.RED, err=True)
         raise typer.Exit(e.returncode) from None
 
+
 PYPROJECT_TEMPLATE = """\
 [project]
 name = "{PROJECT_NAME}"
@@ -52,20 +52,22 @@ requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
 
-def get_pyproject(cwd: Path, fallback_name: str | None= None) -> tomlkit.TOMLDocument:
+
+def get_pyproject(cwd: Path, fallback_name: str | None = None) -> tomlkit.TOMLDocument:
     p = cwd / "pyproject.toml"
     if not p.exists():
         print(f"'pyproject'.toml not found at {p}")
         p.touch()
-        n = fallback_name or inflection.underscore(typer.prompt("What would you like to name your pyproject?"))
-        p.write_text(
-            PYPROJECT_TEMPLATE.format(PROJECT_NAME=n)
+        n = fallback_name or inflection.underscore(
+            typer.prompt("What would you like to name your pyproject?")
         )
+        p.write_text(PYPROJECT_TEMPLATE.format(PROJECT_NAME=n))
         b = cwd / "src" / n
-        b.mkdir(parents=True) 
-        (b / "__init__.py").touch() 
+        b.mkdir(parents=True)
+        (b / "__init__.py").touch()
 
     return tomlkit.parse(p.read_text())
+
 
 def add_workspaces(p: PyProject, workspace: dict[str, str]) -> PyProject:
     def sd(t, name):
@@ -108,13 +110,18 @@ def add_scripts(p: PyProject, scripts: dict[str, str]) -> PyProject:
 def write_pyproject(cwd: Path, p: PyProject) -> None:
     (cwd / "pyproject.toml").write_text(tomlkit.dumps(p))
 
+
 def prepare_pyproject(p: Path, project_name: str | None = None):
-    write_pyproject(p, add_scripts(add_workspaces(get_pyproject(p, project_name), WORKSPACE), SCRIPTS))
+    write_pyproject(
+        p,
+        add_scripts(add_workspaces(get_pyproject(p, project_name), WORKSPACE), SCRIPTS),
+    )
     if len(WORKSPACE) > 0:
         sh(f"uv add --workspace {' '.join(WORKSPACE)}", cwd=p)
     if len(PACKAGES) > 0:
         sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=p)
     sh("uv sync", cwd=p)
+
 
 app = Typer(pretty_exceptions_show_locals=False)
 
@@ -163,10 +170,10 @@ def update(
 def repair(
     cwd: Annotated[
         str, typer.Argument(help="Directory to initialize project in.")
-    ] = "."
+    ] = ".",
 ):
     p = Path(cwd).resolve()
-    prepare_pyproject(p) 
+    prepare_pyproject(p)
 
 
 @app.command(help="Destroy and regenerate the committed example project.")
@@ -181,7 +188,9 @@ def example():
         shutil.rmtree(dst)
     dst.mkdir()
 
-    sh(f"uv run python -m copier copy {str(root)} {str(dst)} --trust -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks")
+    sh(
+        f"uv run python -m copier copy {str(root)} {str(dst)} --trust -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
+    )
 
     (dst / ANSWERS_FILE).unlink(missing_ok=True)
     prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
