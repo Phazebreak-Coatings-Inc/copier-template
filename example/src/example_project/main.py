@@ -1,5 +1,4 @@
 import subprocess
-import inflection
 from pathlib import Path
 from typing import Annotated
 
@@ -13,6 +12,7 @@ type PyProject = tomlkit.TOMLDocument
 type WorkspaceMembers = list[str]
 
 import shutil
+import tempfile
 
 from .config import (
     ANSWERS_FILE,
@@ -40,32 +40,15 @@ def sh(cmd: str, silent=False, check=True, **kwargs) -> subprocess.CompletedProc
         raise typer.Exit(e.returncode) from None
 
 
-PYPROJECT_TEMPLATE = """\
-[project]
-name = "{PROJECT_NAME}"
-version = "0.1.0"
-requires-python = ">=3.14"
-dependencies = []
-
-[build-system]
-requires = ["uv_build>=0.11.18,<0.12"]
-build-backend = "uv_build"
-"""
-
-
-def get_pyproject(cwd: Path, fallback_name: str | None = None) -> tomlkit.TOMLDocument:
+def get_pyproject(cwd: Path) -> tomlkit.TOMLDocument:
     p = cwd / "pyproject.toml"
-    if not p.exists():
-        print(f"'pyproject'.toml not found at {p}")
-        p.touch(exist_ok=True)
-        n = fallback_name or inflection.underscore(
-            typer.prompt("What would you like to name your pyproject?")
-        )
-        p.write_text(PYPROJECT_TEMPLATE.format(PROJECT_NAME=n))
-        b = cwd / "src" / n
-        b.mkdir(parents=True, exist_ok=True)
-        (b / "__init__.py").touch(exist_ok=True)
+    s = f"'pyproject'.toml not found at {p}"
 
+    if not p.exists():
+        if typer.confirm(f"{s}: Initialize a new uv project?", abort=True):
+            sh("uv init")
+            if not p.exists():
+                raise FileNotFoundError(s)
     return tomlkit.parse(p.read_text())
 
 
@@ -110,23 +93,18 @@ def add_scripts(p: PyProject, scripts: dict[str, str]) -> PyProject:
 def write_pyproject(cwd: Path, p: PyProject) -> None:
     (cwd / "pyproject.toml").write_text(tomlkit.dumps(p))
 
-
-def prepare_pyproject(p: Path, project_name: str | None = None):
-    write_pyproject(
-        p,
-        add_scripts(add_workspaces(get_pyproject(p, project_name), WORKSPACE), SCRIPTS),
-    )
+def prepare_pyproject(p: Path):
+    write_pyproject(p, add_scripts(add_workspaces(get_pyproject(p), WORKSPACE), SCRIPTS))
     if len(WORKSPACE) > 0:
         sh(f"uv add --workspace {' '.join(WORKSPACE)}", cwd=p)
     if len(PACKAGES) > 0:
         sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=p)
     sh("uv sync", cwd=p)
 
-
 app = Typer(pretty_exceptions_show_locals=False)
 
 
-@app.command(help="Initialize a new copier-template project.")
+@app.command(help="Initialize a new example_project project.")
 def init(
     dest: Annotated[
         str, typer.Argument(help="Directory to initialize project in.")
@@ -173,7 +151,28 @@ def repair(
     ] = ".",
 ):
     p = Path(cwd).resolve()
-    prepare_pyproject(p)
+    for name, member in WORKSPACE.items():
+        if not (p / member / "pyproject.toml").exists():
+            typer.secho(
+                f"member {member!r} ({name}) has no pyproject.toml",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(1)
+    prepare_pyproject(p) 
+
+
+EXAMPLE_PYPROJECT = f"""\
+[project]
+name = "{EXAMPLE_PROJECT_NAME}"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.18,<0.12"]
+build-backend = "uv_build"
+"""
 
 
 @app.command(help="Destroy and regenerate the committed example project.")
@@ -187,14 +186,19 @@ def example():
     if dst.exists():
         shutil.rmtree(dst)
     dst.mkdir()
+    (dst / "pyproject.toml").write_text(EXAMPLE_PYPROJECT)
+    pkg = dst / "src" / EXAMPLE_PROJECT_NAME.replace("-", "_")
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").touch()
 
-    sh(
-        f"uv run python -m copier copy {str(root)} {str(dst)} --trust -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
-    )
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "template"
+        shutil.copytree(root, src, ignore=shutil.ignore_patterns(".git", ".venv"))
+        sh(f"uv run python -m copier copy {str(src)} {str(dst)} --trust")
 
     (dst / ANSWERS_FILE).unlink(missing_ok=True)
-    prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
+    repair(str(dst))
     sh("uv build --all-packages", cwd=dst)
     sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
-    sh("uv run pytest --ignore=example", cwd=dst, check=False)
+    sh("uv run pytest", cwd=dst)
     typer.secho(f"Regenerated {dst}", fg=typer.colors.GREEN)
