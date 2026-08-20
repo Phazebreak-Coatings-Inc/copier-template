@@ -1,5 +1,5 @@
-COPIER_REPO = "gh:Phazebreak-Coatings-Inc/alembic-environment"
-ANSWERS_FILE = ".copier-answers.yml"
+COPIER_REPO = "gh:Phazebreak-Coatings-Inc/copier-template"
+ANSWERS_FILE = ".copier-template-answers.yml"
 EXAMPLE_NAME = "example"
 EXAMPLE_PROJECT_NAME = "example_project"
 
