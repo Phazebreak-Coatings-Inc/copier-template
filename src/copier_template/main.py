@@ -133,7 +133,7 @@ def init(
     ] = ".",
 ):
     get_pyproject(Path(dest).resolve())
-    copier.run_copy(COPIER_REPO, dest)
+    copier.run_copy(COPIER_REPO, dest, unsafe=True)
     repair(dest)
 
 
@@ -198,3 +198,4 @@ def example():
     sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
     sh("uv run pytest --ignore=example", cwd=dst, check=False)
     typer.secho(f"Regenerated {dst}", fg=typer.colors.GREEN)
+
