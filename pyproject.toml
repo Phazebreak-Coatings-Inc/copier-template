@@ -1,6 +1,6 @@
 [project]
 name = "copier_template"
-version = "0.1.1"
+version = "0.1.2"
 description = "Meta-template for creating copier projects"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -11,6 +11,9 @@ dependencies = [
     "tomlkit>=0.15.0",
     "typer>=0.26.6",
 ]
+
+[project.scripts]
+copier-template = "copier_template.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/Phazebreak-Coatings-Inc/copier-template"
