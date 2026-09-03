@@ -39,4 +39,3 @@ PACKAGES = [
     "typer>=0.26.6",
 ]
 """The packages that should be added to the target pyproject."""
-

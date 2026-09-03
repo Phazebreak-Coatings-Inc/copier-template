@@ -1,15 +1,13 @@
 import subprocess
-import yaml
-import inflection
 from pathlib import Path
 from typing import Annotated
 
 import copier
+import inflection
 import tomlkit
 import typer
-from typer import Typer
 from pydantic import BeforeValidator
-from pydantic import validate_call
+from typer import Typer
 
 type PyProject = tomlkit.TOMLDocument
 
@@ -18,13 +16,13 @@ type WorkspaceMembers = list[str]
 import shutil
 
 from .config import (
+    ANSWERS_FILE,
     COPIER_REPO,
     EXAMPLE_NAME,
     EXAMPLE_PROJECT_NAME,
     PACKAGES,
     SCRIPTS,
     WORKSPACE,
-    ANSWERS_FILE
 )
 
 
@@ -54,6 +52,7 @@ dependencies = []
 requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
+
 
 def get_pyproject(cwd: Path, fallback_name: str | None = None) -> tomlkit.TOMLDocument:
     p = cwd / "pyproject.toml"
@@ -124,13 +123,14 @@ def prepare_pyproject(p: Path, project_name: str | None = None):
         sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=p)
     sh("uv sync", cwd=p)
 
-    
+
 def require_clean(cwd: Path | None = None):
     cwd = cwd or Path.cwd()
     r = sh("git status --porcelain", cwd=cwd, silent=True, check=False)
     if r.stdout.strip():
         typer.secho("Commit or stash changes before updating.", fg=typer.colors.YELLOW)
         raise typer.Exit(1)
+
 
 def validate_template_root(p: str | Path) -> Path:
     if isinstance(p, str):
@@ -139,6 +139,7 @@ def validate_template_root(p: str | Path) -> Path:
         typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
     return p
+
 
 TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
 
@@ -155,11 +156,13 @@ def init(
     copier.run_copy(COPIER_REPO, dest, unsafe=True, answers_file=ANSWERS_FILE)
     repair(dest)
 
+
 @app.command(help="Update your existing project.")
 def update():
-    require_clean() 
+    require_clean()
     sh(f"copier update -a {ANSWERS_FILE} --conflict inline --trust")
     repair()
+
 
 @app.command(help="Hook up dependencies and workspaces correctly.")
 def repair(
@@ -170,12 +173,12 @@ def repair(
     p = Path(cwd).resolve()
     prepare_pyproject(p)
 
+
 @app.command(help="Destroy and regenerate the committed example project.")
 def example():
     # TODO: allow updating / resetting
     root = validate_template_root(Path.cwd().resolve())
     dst = root / EXAMPLE_NAME
-
 
     if dst.exists():
         shutil.rmtree(dst)
