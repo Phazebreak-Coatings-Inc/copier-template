@@ -24,8 +24,7 @@ github_repo:
 
 _subdirectory: template
 _answers_file: .copier-template-answers.yml
-_tasks:
-  - "uvx copier-template repair" 
+#don't use uv in _tasks ... :(
 _exclude:
   - "pyproject.toml"
   - ".venv"
