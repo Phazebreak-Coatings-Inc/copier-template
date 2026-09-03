@@ -160,7 +160,7 @@ def init(
 @app.command(help="Update your existing project.")
 def update():
     require_clean()
-    sh(f"copier update -a {ANSWERS_FILE} --conflict inline --trust")
+    sh(f"copier update -a {ANSWERS_FILE} --conflict inline --trust --skip-tasks")
     repair()
 
 
