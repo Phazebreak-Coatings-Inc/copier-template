@@ -54,6 +54,18 @@ build-backend = "uv_build"
 """
 
 
+def validate_template_root(p: str | Path) -> Path:
+    if isinstance(p, str):
+        p = Path(p)
+    if not (p / "copier.yml").exists():
+        typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    return p
+
+TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
+
+TEMPLATE_ROOT: TemplateRoot = validate_template_root(Path(__file__).parent.parent.parent)
+
 def get_pyproject(cwd: Path, fallback_name: str | None = None) -> tomlkit.TOMLDocument:
     p = cwd / "pyproject.toml"
     if not p.exists():
@@ -132,16 +144,7 @@ def require_clean(cwd: Path | None = None):
         raise typer.Exit(1)
 
 
-def validate_template_root(p: str | Path) -> Path:
-    if isinstance(p, str):
-        p = Path(p)
-    if not (p / "copier.yml").exists():
-        typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
-    return p
 
-
-TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
 
 app = Typer(pretty_exceptions_show_locals=False)
 
@@ -175,8 +178,7 @@ def repair(
 
 
 @app.command(help="Destroy and regenerate the committed example project.")
-def example():
-    # TODO: allow updating / resetting
+def example(): #this command explicitly is not meant to update, it just doesn't work. it's already been tried.... sorry... :(
     root = validate_template_root(Path.cwd().resolve())
     dst = root / EXAMPLE_NAME
 
