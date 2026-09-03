@@ -1,7 +1,7 @@
 project_name:
   type: str 
   help: The name of your next copier-template. #If using 'uvx example, it should be example_project' TODO: hardcode this
-  default: example-project
+  default: example_project
 
 module_name:
   type: str
@@ -23,10 +23,10 @@ github_repo:
   help: Your github repo in the style of 'user/repo' without https://github.com/ 
 
 _subdirectory: template
-_answers_file: .copier-answers.yml
+_answers_file: .copier-template-answers.yml
 _tasks:
   - "uv sync" #TODO: remove later
-  #- "uvx copier-template repair" 
+  - "uvx copier-template repair" 
 _exclude:
   - "pyproject.toml"
   - ".venv"

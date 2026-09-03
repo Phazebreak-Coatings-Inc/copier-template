@@ -1,4 +1,5 @@
 import subprocess
+import yaml
 import inflection
 from pathlib import Path
 from typing import Annotated
@@ -7,6 +8,8 @@ import copier
 import tomlkit
 import typer
 from typer import Typer
+from pydantic import BeforeValidator
+from pydantic import validate_call
 
 type PyProject = tomlkit.TOMLDocument
 
@@ -15,13 +18,13 @@ type WorkspaceMembers = list[str]
 import shutil
 
 from .config import (
-    ANSWERS_FILE,
     COPIER_REPO,
     EXAMPLE_NAME,
     EXAMPLE_PROJECT_NAME,
     PACKAGES,
     SCRIPTS,
     WORKSPACE,
+    ANSWERS_FILE
 )
 
 
@@ -51,7 +54,6 @@ dependencies = []
 requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
-
 
 def get_pyproject(cwd: Path, fallback_name: str | None = None) -> tomlkit.TOMLDocument:
     p = cwd / "pyproject.toml"
@@ -122,6 +124,23 @@ def prepare_pyproject(p: Path, project_name: str | None = None):
         sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=p)
     sh("uv sync", cwd=p)
 
+    
+def require_clean(cwd: Path | None = None):
+    cwd = cwd or Path.cwd()
+    r = sh("git status --porcelain", cwd=cwd, silent=True, check=False)
+    if r.stdout.strip():
+        typer.secho("Commit or stash changes before updating.", fg=typer.colors.YELLOW)
+        raise typer.Exit(1)
+
+def validate_template_root(p: str | Path) -> Path:
+    if isinstance(p, str):
+        p = Path(p)
+    if not (p / "copier.yml").exists():
+        typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    return p
+
+TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
 
 app = Typer(pretty_exceptions_show_locals=False)
 
@@ -133,38 +152,13 @@ def init(
     ] = ".",
 ):
     get_pyproject(Path(dest).resolve())
-    copier.run_copy(COPIER_REPO, dest, unsafe=True)
+    copier.run_copy(COPIER_REPO, dest, unsafe=True, answers_file=ANSWERS_FILE)
     repair(dest)
-
-
 @app.command(help="Update your existing project.")
-def update(
-    abort: Annotated[
-        bool,
-        typer.Option(
-            "--abort",
-            "-a",
-            help="If the abort flag is triggered, this will reset the attempt to update the copier project. Prudent when the changes are too much to resolve.",
-        ),
-    ] = False,
-):
-    match abort:
-        case False:
-            typer.confirm(
-                "Are you sure you want to update? If you need to abort mid-update, it will trigger a 'git reset.' Make sure to save all uncommitted changes.",
-                abort=True,
-            )
-            sh(f"copier update -a {ANSWERS_FILE} --conflict inline")
-        case True:
-            typer.confirm(
-                "Are you sure you want to abort? This will trigger a 'git reset.'",
-                abort=True,
-            )
-            sh("git reset")
-            sh("git checkout .")
-            sh("git clean -d -i")
+def update():
+    require_clean() 
+    sh(f"copier update -a {ANSWERS_FILE} --conflict inline")
     repair()
-
 
 @app.command(help="Hook up dependencies and workspaces correctly.")
 def repair(
@@ -175,27 +169,30 @@ def repair(
     p = Path(cwd).resolve()
     prepare_pyproject(p)
 
-
 @app.command(help="Destroy and regenerate the committed example project.")
-def example():
-    root = Path.cwd().resolve()
-    if not (root / "copier.yml").exists():
-        typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
-
+def example(r: Annotated[bool, typer.Option("-r", "--reset", help="Fully destroys the example and recopies from scratch.")] = False):
+    # TODO: allow updating / resetting
+    root = validate_template_root(Path.cwd().resolve())
     dst = root / EXAMPLE_NAME
-    if dst.exists():
-        shutil.rmtree(dst)
-    dst.mkdir()
+    if not (dst / ANSWERS_FILE).exists():
+        typer.secho("No answers file found. Force resetting.", fg=typer.colors.RED)
+        r = True
 
-    sh(
-        f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
-    )
+    if r:
+        if dst.exists():
+            shutil.rmtree(dst)
+        dst.mkdir()
 
-    (dst / ANSWERS_FILE).unlink(missing_ok=True)
-    prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
-    sh("uv build --all-packages", cwd=dst)
-    sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
-    sh("uv run pytest --ignore=example", cwd=dst, check=False)
-    typer.secho(f"Regenerated {dst}", fg=typer.colors.GREEN)
+        sh(
+            f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
+        )
 
+        (dst / ANSWERS_FILE).unlink(missing_ok=True)
+        prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
+        sh("uv build --all-packages", cwd=dst)
+        sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
+        sh("uv run pytest --ignore=example", cwd=dst, check=False)
+        typer.secho(f"Regenerated {dst}", fg=typer.colors.GREEN)
+    else:
+        require_clean() 
+        sh(f"copier update -a {ANSWERS_FILE} --conflict inline", cwd= dst)
