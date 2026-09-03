@@ -154,10 +154,11 @@ def init(
     get_pyproject(Path(dest).resolve())
     copier.run_copy(COPIER_REPO, dest, unsafe=True, answers_file=ANSWERS_FILE)
     repair(dest)
+
 @app.command(help="Update your existing project.")
 def update():
     require_clean() 
-    sh(f"copier update -a {ANSWERS_FILE} --conflict inline")
+    sh(f"copier update -a {ANSWERS_FILE} --conflict inline --trust")
     repair()
 
 @app.command(help="Hook up dependencies and workspaces correctly.")
