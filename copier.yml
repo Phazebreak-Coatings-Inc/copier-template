@@ -1,7 +1,17 @@
 project_name:
   type: str 
   help: The name of your next copier-template. #If using 'uvx example, it should be example_project' TODO: hardcode this
-  default: example_project
+  default: example-project
+
+module_name:
+  type: str
+  default: "{{ project_name | lower | replace('-', '_') | replace(' ', '_') }}"
+  when: false
+
+package_name:
+  type: str
+  default: "{{ project_name | lower | replace('_', '-') }}"
+  when: false
 
 your_name:
   type: str

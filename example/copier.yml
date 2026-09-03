@@ -1,7 +1,7 @@
 _subdirectory: template
-_answers_file: .example_project-answers.yml
+_answers_file: .example-project-answers.yml
 _tasks:
-  - "uvx example_project repair" 
+  - "uvx example-project repair" 
 _exclude:
   - ".git"
   - ".gitignore"

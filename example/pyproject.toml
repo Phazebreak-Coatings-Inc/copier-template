@@ -1,5 +1,5 @@
 [project]
-name = "example_project"
+name = "example-project"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = []
@@ -10,9 +10,9 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "copier>=9.17.2",
+    "copier>=9.18.1",
     "inflection>=0.5.1",
     "pytest>=9.1.1",
     "tomlkit>=0.15.1",
-    "typer>=0.27.1",
+    "typer>=0.27.2",
 ]

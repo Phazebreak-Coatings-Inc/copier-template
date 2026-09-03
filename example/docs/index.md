@@ -12,13 +12,13 @@ uv init
 Then we'll use ```uvx``` to create copy the directory from remote.
 
 ```sh
-uvx example_project init . 
+uvx example-project init . 
 
 ```
 If the template updates from remote, we can use this command to sync it:
 
 ```sh
-uvx example_project update
+uvx example-project update
 ```
 
 
