@@ -53,6 +53,15 @@ requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
 
+def validate_template_root(p: str | Path) -> Path:
+    if isinstance(p, str):
+        p = Path(p)
+    if not (p / "copier.yml").exists():
+        typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    return p
+
+TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
 
 def validate_template_root(p: str | Path) -> Path:
     if isinstance(p, str):

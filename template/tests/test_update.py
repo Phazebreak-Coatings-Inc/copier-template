@@ -1,6 +1,9 @@
 import pytest
 import subprocess
-from copier_template.main import sh, EXAMPLE_PROJECT_NAME, TEMPLATE_ROOT
+from copier_template.main import sh, EXAMPLE_PROJECT_NAME
+from pathlib import Path
+
+TEMPLATE_ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.mark.slow
 def test_update(tmp_path):
@@ -10,6 +13,7 @@ def test_update(tmp_path):
         cwd=TEMPLATE_ROOT,
         text=True,
     ).strip()
+    print(f'prev version is {prev}')
 
     sh(
         f"copier copy {TEMPLATE_ROOT} {dst} --trust --vcs-ref={prev} "
