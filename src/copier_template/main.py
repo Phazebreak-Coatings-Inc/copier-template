@@ -126,7 +126,7 @@ def prepare_pyproject(p: Path, project_name: str | None = None):
 app = Typer(pretty_exceptions_show_locals=False)
 
 
-@app.command(help="Initialize a new copier-template project.")
+@app.command(help="Initialize a new project.")
 def init(
     dest: Annotated[
         str, typer.Argument(help="Directory to initialize project in.")
@@ -189,7 +189,7 @@ def example():
     dst.mkdir()
 
     sh(
-        f"uv run python -m copier copy {str(root)} {str(dst)} --trust -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
+        f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
     )
 
     (dst / ANSWERS_FILE).unlink(missing_ok=True)
