@@ -63,6 +63,18 @@ def validate_template_root(p: str | Path) -> Path:
 
 TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
 
+def validate_template_root(p: str | Path) -> Path:
+    if isinstance(p, str):
+        p = Path(p)
+    if not (p / "copier.yml").exists():
+        typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    return p
+
+TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
+
+TEMPLATE_ROOT: TemplateRoot = validate_template_root(Path(__file__).parent.parent.parent)
+
 def get_pyproject(cwd: Path, fallback_name: str | None = None) -> tomlkit.TOMLDocument:
     p = cwd / "pyproject.toml"
     if not p.exists():
