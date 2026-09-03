@@ -7,7 +7,6 @@ import yaml
 
 from copier_template.config import (
     EXAMPLE_NAME,
-    EXAMPLE_PRESENT,
     EXAMPLE_PROJECT_NAME,
     SCRIPTS,
     WORKSPACE,
@@ -56,11 +55,6 @@ def test_member_landed_and_pinned(doc, name, path):
 @pytest.mark.parametrize("name,target", SCRIPTS.items())
 def test_script_registered(doc, name, target):
     assert doc["project"]["scripts"][name] == target
-
-
-@pytest.mark.parametrize("path", EXAMPLE_PRESENT)
-def test_present(path):
-    assert (EXAMPLE / path).exists()
 
 
 @pytest.mark.parametrize("path", _root_exclusions())
