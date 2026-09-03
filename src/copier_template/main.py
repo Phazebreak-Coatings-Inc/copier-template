@@ -170,28 +170,22 @@ def repair(
     prepare_pyproject(p)
 
 @app.command(help="Destroy and regenerate the committed example project.")
-def example(r: Annotated[bool, typer.Option("-r", "--reset", help="Fully destroys the example and recopies from scratch.")] = False):
+def example():
     # TODO: allow updating / resetting
     root = validate_template_root(Path.cwd().resolve())
     dst = root / EXAMPLE_NAME
-    if not (dst / ANSWERS_FILE).exists():
-        typer.secho("No answers file found. Force resetting.", fg=typer.colors.RED)
-        r = True
 
-    if r:
-        if dst.exists():
-            shutil.rmtree(dst)
-        dst.mkdir()
 
-        sh(
-            f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
-        )
+    if dst.exists():
+        shutil.rmtree(dst)
+    dst.mkdir()
 
-        prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
-        sh("uv build --all-packages", cwd=dst)
-        sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
-        sh("uv run pytest --ignore=example", cwd=dst, check=False)
-        typer.secho(f"Regenerated {dst}", fg=typer.colors.GREEN)
-    else:
-        require_clean() 
-        sh(f"copier update -a {ANSWERS_FILE} --conflict inline", cwd= dst)
+    sh(
+        f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
+    )
+
+    prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
+    sh("uv build --all-packages", cwd=dst)
+    sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
+    sh("uv run pytest --ignore=example", cwd=dst, check=False)
+    typer.secho(f"Regenerated {dst}", fg=typer.colors.GREEN)
