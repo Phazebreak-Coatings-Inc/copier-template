@@ -1,6 +1,8 @@
 import pytest
 import subprocess
-from copier_template.main import sh, EXAMPLE_PROJECT_NAME, TEMPLATE_ROOT
+from copier_template.main import sh, EXAMPLE_PROJECT_NAME
+
+TEMPLATE_ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.mark.slow
 def test_update(tmp_path):

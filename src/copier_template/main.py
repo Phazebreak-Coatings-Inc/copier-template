@@ -53,7 +53,6 @@ requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
 
-
 def validate_template_root(p: str | Path) -> Path:
     if isinstance(p, str):
         p = Path(p)
@@ -63,8 +62,6 @@ def validate_template_root(p: str | Path) -> Path:
     return p
 
 TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
-
-TEMPLATE_ROOT: TemplateRoot = validate_template_root(Path(__file__).parent.parent.parent)
 
 def get_pyproject(cwd: Path, fallback_name: str | None = None) -> tomlkit.TOMLDocument:
     p = cwd / "pyproject.toml"
