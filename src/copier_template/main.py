@@ -187,7 +187,6 @@ def example(r: Annotated[bool, typer.Option("-r", "--reset", help="Fully destroy
             f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
         )
 
-        (dst / ANSWERS_FILE).unlink(missing_ok=True)
         prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
         sh("uv build --all-packages", cwd=dst)
         sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
