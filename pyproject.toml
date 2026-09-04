@@ -1,6 +1,6 @@
 [project]
 name = "copier_template"
-version = "0.1.6.post4"
+version = "0.1.7"
 description = "Meta-template for creating copier projects"
 readme = "README.md"
 requires-python = ">=3.14"
