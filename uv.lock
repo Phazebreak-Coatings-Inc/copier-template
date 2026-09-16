@@ -65,6 +65,11 @@ dependencies = [
     { name = "typer" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "ssort" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "copier", specifier = ">=9.15.1" },
@@ -73,6 +78,9 @@ requires-dist = [
     { name = "tomlkit", specifier = ">=0.15.0" },
     { name = "typer", specifier = ">=0.26.6" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ssort", specifier = ">=0.17.0" }]
 
 [[package]]
 name = "dunamai"
@@ -398,6 +406,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/58/15/8b3609fd3830ef7b27b655beb4b4e9c62313a4e8da8c676e142cc210d58e/shellingham-1.5.4.tar.gz", hash = "sha256:8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de", size = 10310, upload-time = "2023-10-24T04:13:40.426Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl", hash = "sha256:7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686", size = 9755, upload-time = "2023-10-24T04:13:38.866Z" },
+]
+
+[[package]]
+name = "ssort"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pathspec" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/6d/635cb5cf18f84f514ff085d7856bbc293f4671e00c29b6648221106ead48/ssort-0.17.0.tar.gz", hash = "sha256:acfb38409476520c3e25541c282f7cef92017900d859f6b12bea48da4334b194", size = 23363, upload-time = "2026-08-03T12:06:45.674Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/0b/ba965b79d65aecf00b12e8de7c98a46f62d2c575f55b576105010b152ef4/ssort-0.17.0-py3-none-any.whl", hash = "sha256:acb57f75cf9521d80a3cf1572ad4cdb969b28d08d8c4c08957c91517c5dd5d93", size = 27799, upload-time = "2026-08-03T12:06:44.581Z" },
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 COPIER_REPO = "gh:"
 """The repo that copier should target."""
 
-ANSWERS_FILE = ".example-project-answers.yml"
+ANSWERS_FILE = ".example_project-answers.yml"
 """The actual answers file that will be saved after user-interaction. 
 
 If it has the same name as another copier-template project, your template will break.

@@ -52,3 +52,5 @@ _exclude:
   - "override.tf.json"
   - "*_override.tf"
   - "*_override.tf.json"
+#_skip_if_exists:
+#  - tests/
