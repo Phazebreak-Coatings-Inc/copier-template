@@ -37,6 +37,6 @@ PACKAGES = [
     "pytest>=9.1.1",
     "tomlkit>=0.15.0",
     "typer>=0.26.6",
-    "copier_template>=0.17.0"
+    "copier_template>=0.17.0",
 ]
 """The packages that should be added to the target pyproject."""

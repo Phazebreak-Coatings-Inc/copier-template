@@ -1,32 +1,28 @@
-import typer
-import os
-from pydantic import (
-    BaseModel,
-    model_validator,
-    JsonValue,
-    Secret,
-    BeforeValidator,
-    PrivateAttr
-)
-from typing import (
-    Any,
-    Annotated,
-    Mapping,
-    cast
-)
-import subprocess
-from pathlib import Path
 import functools
 import json
+import os
+import subprocess
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Self
+from typing import Annotated, Any, Self, cast
 
 import inflection
 import tomlkit
 import typer
-from pydantic import BaseModel, BeforeValidator, ConfigDict, PrivateAttr, StringConstraints, validate_call
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    JsonValue,
+    PrivateAttr,
+    Secret,
+    StringConstraints,
+    model_validator,
+    validate_call,
+)
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
+
 
 def e(func):
     @functools.wraps(func)
@@ -42,6 +38,7 @@ def e(func):
             raise typer.Exit(1)
 
     return wrapper
+
 
 def sh(
     cmd: str, silent=False, check=True, env: dict[str, Any] = {}, **kwargs
@@ -67,6 +64,7 @@ def sh(
                 typer.secho(output.rstrip(), fg=typer.colors.RED, err=True)
         raise typer.Exit(e.returncode) from None
 
+
 def is_terraform_dir(p: Path | str) -> Path:
     if isinstance(p, str):
         p = Path(p)
@@ -74,9 +72,12 @@ def is_terraform_dir(p: Path | str) -> Path:
         raise ValueError(f"The following is not a terraform directory: {p}")
     return p
 
+
 TerraformDir = Annotated[Path, BeforeValidator(is_terraform_dir)]
 
+
 class TerraformOutputError(Exception): ...
+
 
 class TerraformOutput(BaseModel):
     value: JsonValue | Secret[JsonValue]
@@ -94,15 +95,20 @@ class TerraformOutput(BaseModel):
             return self.value.get_secret_value()
         return self.value  # if on accident
 
-def are_valid_tf_vars(t: dict[str, JsonValue | Secret[JsonValue]]) -> TFVars: 
+
+def are_valid_tf_vars(t: dict[str, JsonValue | Secret[JsonValue]]) -> TFVars:
     if bad := sorted(k for k in t if not k.startswith("TF_")):
         raise ValueError(f"Keys passed to tf vars must start with 'TF_': {bad}")
     return t
 
-TFVars = Annotated[dict[str, JsonValue | Secret[JsonValue]], BeforeValidator(are_valid_tf_vars)]
+
+TFVars = Annotated[
+    dict[str, JsonValue | Secret[JsonValue]], BeforeValidator(are_valid_tf_vars)
+]
+
 
 class TerraformModule[OutputsShape: Mapping = Mapping](BaseModel):
-    tf_vars: TFVars 
+    tf_vars: TFVars
     cwd: TerraformDir
     _outputs_cache: dict[str, TerraformOutput] | None = PrivateAttr(default=None)
 
@@ -113,10 +119,7 @@ class TerraformModule[OutputsShape: Mapping = Mapping](BaseModel):
             check=check,
             silent=silent,
             text=True,
-            env={
-                **os.environ,
-                **self.tf_vars
-            },
+            env={**os.environ, **self.tf_vars},
             **kwargs,
         )
 
@@ -175,7 +178,11 @@ def to_posix(s: str | Path) -> str:
     return Path(s).as_posix()
 
 
-PackageName = Annotated[str, BeforeValidator(to_package_name), StringConstraints(pattern=r"^[a-z_][a-z0-9_]*$")]
+PackageName = Annotated[
+    str,
+    BeforeValidator(to_package_name),
+    StringConstraints(pattern=r"^[a-z_][a-z0-9_]*$"),
+]
 DistName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")]
 EntryPoint = Annotated[str, StringConstraints(pattern=r"^[\w.]+:[\w.]+$")]
 MemberPath = Annotated[str, BeforeValidator(to_posix), StringConstraints(min_length=1)]
@@ -195,6 +202,7 @@ class ProjectTable(BaseModel):
     def package(self) -> str:
         return to_package_name(self.name)
 
+
 PYPROJECT_TEMPLATE = """\
 [project]
 name = "{PROJECT_NAME}"
@@ -206,6 +214,7 @@ dependencies = []
 requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
+
 
 class PyProject(BaseModel):
     cwd: Path
@@ -254,13 +263,17 @@ class PyProject(BaseModel):
         if self.exists:
             return self
         typer.secho(f"pyproject.toml not found at {self.path}", fg=typer.colors.YELLOW)
-        return self.create(name or typer.prompt("What would you like to name your project?"))
+        return self.create(
+            name or typer.prompt("What would you like to name your project?")
+        )
 
     @validate_call
     def add_workspace(self, members: Workspace) -> Self:
         if not members:
             return self
-        arr = self.table("tool", "uv", "workspace").setdefault("members", tomlkit.array())
+        arr = self.table("tool", "uv", "workspace").setdefault(
+            "members", tomlkit.array()
+        )
         for m in members.values():
             if m not in arr:
                 arr.append(m)

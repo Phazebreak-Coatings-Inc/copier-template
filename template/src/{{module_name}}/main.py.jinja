@@ -18,7 +18,8 @@ from .config import (
 )
 from copier_template.util import (
     PyProject,
-    sh
+    sh,
+    e
 )
 
 def validate_template_root(p: str | Path) -> Path:
@@ -55,11 +56,13 @@ CwdArgument = Annotated[Path, typer.Argument(help="Project directory.", resolve_
 app = Typer()
 
 @app.command(help="Hook up dependencies and workspaces correctly.")
+@e
 def repair(cwd: CwdArgument = Path(".")):
     prepare_pyproject(cwd)
 
 
 @app.command(help="Initialize a new project.")
+@e
 def init(dest: CwdArgument = Path(".")):
     pyproject(dest).ensure()
     copier.run_copy(COPIER_REPO, str(dest), unsafe=True, answers_file=ANSWERS_FILE)
@@ -67,13 +70,15 @@ def init(dest: CwdArgument = Path(".")):
 
 
 @app.command(help="Update your existing project.")
+@e
 def update(cwd: CwdArgument = Path(".")):
     require_clean(cwd)
     sh(f"copier update -a {ANSWERS_FILE} --conflict inline --trust --skip-tasks", cwd=cwd)
     repair(cwd)
 
 
-@app.command(help="Destroy and regenerate the committed example project.")
+@app.command(help="Destroy and regenerate the committed example project.", hidden=True)
+@e
 def example():  # this command explicitly is not meant to update, it just doesn't work. it's already been tried.... sorry... :(
     root = validate_template_root(Path.cwd().resolve())
     dst = root / EXAMPLE_NAME
