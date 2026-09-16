@@ -29,6 +29,7 @@ def validate_template_root(p: str | Path) -> Path:
     return p
 
 
+
 TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
 
 
