@@ -6,7 +6,7 @@ import tomlkit
 import typer
 from pydantic import Secret, TypeAdapter, ValidationError
 
-import copier_template.util as util
+from copier_template import util
 from copier_template.util import (
     EntryPoint,
     MemberPath,
@@ -22,14 +22,20 @@ from copier_template.util import (
 
 OUTPUTS = json.dumps(
     {
-        "config": {"value": {"a": 1}, "sensitive": False, "type": ["object", {"a": "number"}]},
+        "config": {
+            "value": {"a": 1},
+            "sensitive": False,
+            "type": ["object", {"a": "number"}],
+        },
         "token": {"value": "s3cret", "sensitive": True, "type": "string"},
     }
 )
 
 
 def completed(stdout: str = "", returncode: int = 0) -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess(args="", returncode=returncode, stdout=stdout, stderr="")
+    return subprocess.CompletedProcess(
+        args="", returncode=returncode, stdout=stdout, stderr=""
+    )
 
 
 @pytest.fixture
@@ -181,7 +187,11 @@ class TestTerraformModule:
     def test_env_values_are_strings(self, tf_dir, fake_sh):
         m = TerraformModule(
             cwd=tf_dir,
-            tf_vars={"TF_VAR_token": Secret("x"), "TF_VAR_list": ["a"], "TF_VAR_name": "n"},
+            tf_vars={
+                "TF_VAR_token": Secret("x"),
+                "TF_VAR_list": ["a"],
+                "TF_VAR_name": "n",
+            },
         )
         m.tf("version")
         env = fake_sh.calls[-1][1]["env"]
@@ -194,7 +204,11 @@ class TestTerraformModule:
 class TestTypes:
     @pytest.mark.parametrize(
         "raw, expected",
-        [("My-Project", "my_project"), (" orders ", "orders"), ("OrdersAPI", "orders_api")],
+        [
+            ("My-Project", "my_project"),
+            (" orders ", "orders"),
+            ("OrdersAPI", "orders_api"),
+        ],
     )
     def test_package_name(self, raw, expected):
         assert TypeAdapter(PackageName).validate_python(raw) == expected
@@ -245,7 +259,9 @@ class TestPyProject:
 
     def test_add_workspace_is_idempotent(self, tmp_path):
         pp = PyProject(cwd=tmp_path).create("app")
-        pp.add_workspace({"core": "libs/core"}).add_workspace({"core": "libs/core"}).save()
+        pp.add_workspace({"core": "libs/core"}).add_workspace(
+            {"core": "libs/core"}
+        ).save()
         data = tomlkit.parse((tmp_path / "pyproject.toml").read_text()).unwrap()
         assert data["tool"]["uv"]["workspace"]["members"] == ["libs/core"]
         assert data["tool"]["uv"]["sources"]["core"] == {"workspace": True}
@@ -257,10 +273,16 @@ class TestPyProject:
             '[tool.uv.workspace]\nmembers = ["libs/old"]\n\n'
             '[tool.uv.sources]\ncore = { path = "../core" }\n'
         )
-        PyProject(cwd=tmp_path).add_workspace({"core": "libs/core", "new": "libs/new"}).save()
+        PyProject(cwd=tmp_path).add_workspace(
+            {"core": "libs/core", "new": "libs/new"}
+        ).save()
         text = (tmp_path / "pyproject.toml").read_text()
         data = tomlkit.parse(text).unwrap()
-        assert data["tool"]["uv"]["workspace"]["members"] == ["libs/old", "libs/core", "libs/new"]
+        assert data["tool"]["uv"]["workspace"]["members"] == [
+            "libs/old",
+            "libs/core",
+            "libs/new",
+        ]
         assert data["tool"]["uv"]["sources"]["core"] == {"path": "../core"}
         assert data["tool"]["uv"]["sources"]["new"] == {"workspace": True}
         assert "# keep me" in text
@@ -289,5 +311,7 @@ class TestPyProject:
         assert pp.reload().project.name == "renamed"
 
     def test_virtual_root_has_no_project(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text('[tool.uv.workspace]\nmembers = ["a"]\n')
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.uv.workspace]\nmembers = ["a"]\n'
+        )
         assert PyProject(cwd=tmp_path).project is None

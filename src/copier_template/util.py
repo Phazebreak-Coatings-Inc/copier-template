@@ -1,11 +1,11 @@
 import functools
 import json
 import os
-import subprocess
 import re
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Any, Self, cast
+from typing import Annotated, Self, cast
 
 import inflection
 import tomlkit
@@ -42,11 +42,7 @@ def e(func):
 
 
 def sh(
-    cmd: str, 
-    silent=False, 
-    check=True, 
-    env: dict[str, str] | None = None,
-    **kwargs
+    cmd: str, silent=False, check=True, env: dict[str, str] | None = None, **kwargs
 ) -> subprocess.CompletedProcess:
     if silent:
         kwargs.setdefault("stdout", subprocess.PIPE)
@@ -110,6 +106,7 @@ def are_valid_tf_vars(t: dict[str, JsonValue | Secret[JsonValue]]) -> TFVars:
 TFVars = Annotated[
     dict[str, JsonValue | Secret[JsonValue]], BeforeValidator(are_valid_tf_vars)
 ]
+
 
 def to_env_value(v: JsonValue | Secret[JsonValue]) -> str:
     if isinstance(v, Secret):
