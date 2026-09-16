@@ -2,6 +2,7 @@ import functools
 import json
 import os
 import subprocess
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Any, Self, cast
@@ -41,7 +42,11 @@ def e(func):
 
 
 def sh(
-    cmd: str, silent=False, check=True, env: dict[str, Any] = {}, **kwargs
+    cmd: str, 
+    silent=False, 
+    check=True, 
+    env: dict[str, str] | None = None,
+    **kwargs
 ) -> subprocess.CompletedProcess:
     if silent:
         kwargs.setdefault("stdout", subprocess.PIPE)
@@ -106,6 +111,11 @@ TFVars = Annotated[
     dict[str, JsonValue | Secret[JsonValue]], BeforeValidator(are_valid_tf_vars)
 ]
 
+def to_env_value(v: JsonValue | Secret[JsonValue]) -> str:
+    if isinstance(v, Secret):
+        v = v.get_secret_value()
+    return v if isinstance(v, str) else json.dumps(v)
+
 
 class TerraformModule[OutputsShape: Mapping = Mapping](BaseModel):
     tf_vars: TFVars
@@ -119,7 +129,7 @@ class TerraformModule[OutputsShape: Mapping = Mapping](BaseModel):
             check=check,
             silent=silent,
             text=True,
-            env={**os.environ, **self.tf_vars},
+            env={k: to_env_value(v) for k, v in self.tf_vars.items()},
             **kwargs,
         )
 
@@ -171,11 +181,11 @@ class TerraformModule[OutputsShape: Mapping = Mapping](BaseModel):
 
 
 def to_package_name(s: str) -> str:
-    return inflection.underscore(s.strip().replace("-", "_"))
+    return re.sub(r"[^a-z0-9_]+", "_", inflection.underscore(s.strip())).strip("_")
 
 
 def to_posix(s: str | Path) -> str:
-    return Path(s).as_posix()
+    return str(s).replace("\\", "/")
 
 
 PackageName = Annotated[
@@ -238,8 +248,9 @@ class PyProject(BaseModel):
         return self._doc
 
     @property
-    def project(self) -> ProjectTable:
-        return ProjectTable.model_validate(self.doc.unwrap().get("project", {}))
+    def project(self) -> ProjectTable | None:
+        data = self.doc.unwrap().get("project")
+        return ProjectTable.model_validate(data) if data else None
 
     def reload(self) -> Self:
         self._doc = None

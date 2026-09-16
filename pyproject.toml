@@ -38,7 +38,11 @@ norecursedirs = [
     "venv",
     "{arch}",
     "example",
+    "template",
+    ".venv"
 ]
+testpaths = ["tests"]
+markers = ["slow"]
 
 [tool.ruff]
 exclude = ["example", "template"]
