@@ -1,6 +1,6 @@
 [project]
 name = "copier_template"
-version = "0.1.7"
+version = "0.1.8"
 description = "Meta-template for creating copier projects"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 copier-template = "copier_template.__main__:main"
+copier_template = "copier_template.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/Phazebreak-Coatings-Inc/copier-template"
@@ -37,7 +38,11 @@ norecursedirs = [
     "venv",
     "{arch}",
     "example",
+    "template",
+    ".venv"
 ]
+testpaths = ["tests"]
+markers = ["slow"]
 
 [tool.ruff]
 exclude = ["example", "template"]
@@ -45,3 +50,8 @@ exclude = ["example", "template"]
 [tool.uv.workspace]
 members = []
 exclude = ["example", "template"]
+
+[dependency-groups]
+dev = [
+    "ssort>=0.17.0",
+]
