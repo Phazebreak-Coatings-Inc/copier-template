@@ -2,9 +2,7 @@
 name = "example_project"
 version = "0.1.0"
 requires-python = ">=3.14"
-dependencies = [
-    "copier-template>=0.1.9",
-]
+dependencies = ["copier-template>=0.1.9"]
 
 [build-system]
 requires = ["uv_build>=0.11.18,<0.12"]
@@ -14,10 +12,4 @@ build-backend = "uv_build"
 copier-template = {path = "..", editable = true}
 
 [dependency-groups]
-dev = [
-    "copier>=9.15.1",
-    "inflection>=0.5.1",
-    "pytest>=9.1.1",
-    "tomlkit>=0.15.0",
-    "typer>=0.26.6",
-]
+dev = ["copier>=9.15.1", "inflection>=0.5.1", "pytest>=9.1.1", "tomlkit>=0.15.0", "typer>=0.26.6"]
