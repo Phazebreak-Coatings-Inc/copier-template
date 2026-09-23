@@ -23,6 +23,7 @@ def test_update(tmp_path):
     sh("git init", cwd=dst)
     sh("git add -A", cwd=dst)
     sh('git -c user.email=t@t -c user.name=t commit -m "init"', cwd=dst)
-    sh("copier update --trust --vcs-ref=HEAD --defaults --conflict rej", cwd=dst)
+    sh('uv init')
+    sh("uvx copier update --trust --vcs-ref=HEAD --defaults --conflict rej", cwd=dst)
 
     assert not list(dst.rglob("*.rej"))
