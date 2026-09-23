@@ -1,12 +1,13 @@
 import functools
 import json
+import logging
 import os
 import re
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Self, cast
-import logging
+
 import inflection
 import tomlkit
 import typer
