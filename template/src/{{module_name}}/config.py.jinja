@@ -12,7 +12,7 @@ Do not edit unless also changing the value in copier.yml.
 EXAMPLE_NAME = "example"
 """This is only used for the target dir where 'uv run python -m copier_template example ends up."""
 
-EXAMPLE_PROJECT_NAME = "example-project"
+EXAMPLE_PROJECT_NAME = "example_project"
 """This is what the pyproject.toml.[project].name will be after running 'uv run python -m copier_template example'"""
 
 WORKSPACE: dict[str, str] = {}
@@ -40,5 +40,8 @@ PACKAGES = [
     "tomlkit>=0.15.0",
     "typer>=0.26.6",
 ]
-"""The packages that should be added to the target pyproject."""
+"""The dev packages that should be added to the target pyproject."""
+
+DEPENDENCIES: list[str] = []
+"""The runtime packages that should be added to the target pyproject."""
 

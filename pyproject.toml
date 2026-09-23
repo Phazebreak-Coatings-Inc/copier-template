@@ -1,6 +1,6 @@
 [project]
 name = "copier_template"
-version = "0.1.8"
+version = "0.1.9"
 description = "Meta-template for creating copier projects"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -46,6 +46,18 @@ markers = ["slow"]
 
 [tool.ruff]
 exclude = ["example", "template"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes (syntax, undefined names, etc.)
+    "I",    # isort (clean and sorted imports)
+    "UP",   # pyupgrade (upgrades syntax to your target Python version)
+    "B",    # flake8-bugbear (catches design flaws and subtle bugs)
+    "SIM",  # flake8-simplify (suggests simpler code structures)
+    "C90",  # mccabe (prevents overly complex functions)
+]
 
 [tool.uv.workspace]
 members = []

@@ -3,15 +3,17 @@ from pathlib import Path
 from typing import Annotated
 
 import copier
+import tomlkit
 import typer
 from pydantic import BeforeValidator
 from typer import Typer
 
-from copier_template.util import PyProject, e, sh
+from copier_template.util import PyProject, cli_exception_handler, quote, sh
 
 from .config import (
     ANSWERS_FILE,
     COPIER_REPO,
+    DEPENDENCIES,
     EXAMPLE_NAME,
     EXAMPLE_PROJECT_NAME,
     PACKAGES,
@@ -27,7 +29,6 @@ def validate_template_root(p: str | Path) -> Path:
         typer.secho("Run from the template repo root.", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
     return p
-
 
 
 TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
@@ -46,9 +47,11 @@ def prepare_pyproject(cwd: Path, project_name: str | None = None) -> PyProject:
         .save()
     )
     if WORKSPACE:
-        sh(f"uv add --workspace {' '.join(WORKSPACE)}", cwd=cwd)
+        sh(f"uv add --workspace {quote(WORKSPACE)}", cwd=cwd)
+    if DEPENDENCIES:
+        sh(f"uv add {quote(DEPENDENCIES)}", cwd=cwd)
     if PACKAGES:
-        sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=cwd)
+        sh(f"uv add --dev {quote(PACKAGES)}", cwd=cwd)
     sh("uv sync", cwd=cwd)
     return pp.reload()
 
@@ -68,13 +71,13 @@ app = Typer()
 
 
 @app.command(help="Hook up dependencies and workspaces correctly.")
-@e
+@cli_exception_handler
 def repair(cwd: CwdArgument = Path(".")):
     prepare_pyproject(cwd)
 
 
 @app.command(help="Initialize a new project.")
-@e
+@cli_exception_handler
 def init(dest: CwdArgument = Path(".")):
     pyproject(dest).ensure()
     copier.run_copy(COPIER_REPO, str(dest), unsafe=True, answers_file=ANSWERS_FILE)
@@ -82,7 +85,7 @@ def init(dest: CwdArgument = Path(".")):
 
 
 @app.command(help="Update your existing project.")
-@e
+@cli_exception_handler
 def update(cwd: CwdArgument = Path(".")):
     require_clean(cwd)
     sh(
@@ -93,7 +96,7 @@ def update(cwd: CwdArgument = Path(".")):
 
 
 @app.command(help="Destroy and regenerate the committed example project.", hidden=True)
-@e
+@cli_exception_handler
 def example():  # this command explicitly is not meant to update, it just doesn't work. it's already been tried.... sorry... :(
     root = validate_template_root(Path.cwd().resolve())
     dst = root / EXAMPLE_NAME
@@ -106,6 +109,11 @@ def example():  # this command explicitly is not meant to update, it just doesn'
         f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
     )
 
+    pp = pyproject(dst).ensure(EXAMPLE_PROJECT_NAME)
+    source = tomlkit.inline_table()
+    source.update({"path": "..", "editable": True})
+    pp.table("tool", "uv", "sources")["copier-template"] = source
+    pp.save()
     prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
     sh("uv build --all-packages", cwd=dst)
     sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)

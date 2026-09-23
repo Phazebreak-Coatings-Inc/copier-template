@@ -16,7 +16,7 @@ from copier_template.util import (
     TerraformModule,
     TerraformOutput,
     TerraformOutputError,
-    e,
+    cli_exception_handler,
     sh,
 )
 
@@ -66,11 +66,11 @@ def module(tf_dir, fake_sh):
     return TerraformModule(cwd=tf_dir, tf_vars={})
 
 
-class TestE:
+class TestCLIExceptionHandler:
     def test_wraps_errors_as_exit(self, monkeypatch, capsys):
         monkeypatch.delenv("DEBUG", raising=False)
 
-        @e
+        @cli_exception_handler
         def boom():
             raise RuntimeError("bad thing")
 
@@ -82,7 +82,7 @@ class TestE:
     def test_debug_reraises(self, monkeypatch):
         monkeypatch.setenv("DEBUG", "1")
 
-        @e
+        @cli_exception_handler
         def boom():
             raise RuntimeError("bad thing")
 
@@ -90,7 +90,7 @@ class TestE:
             boom()
 
     def test_exit_passes_through(self):
-        @e
+        @cli_exception_handler
         def stop():
             raise typer.Exit(3)
 

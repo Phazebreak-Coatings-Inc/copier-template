@@ -10,6 +10,7 @@ import shutil
 from .config import (
     ANSWERS_FILE,
     COPIER_REPO,
+    DEPENDENCIES,
     EXAMPLE_NAME,
     EXAMPLE_PROJECT_NAME,
     PACKAGES,
@@ -18,7 +19,9 @@ from .config import (
 )
 from copier_template.util import (
     PyProject,
-    sh
+    sh,
+    cli_exception_handler,
+    quote,
 )
 
 def validate_template_root(p: str | Path) -> Path:
@@ -37,9 +40,11 @@ def pyproject(cwd: Path) -> PyProject:
 def prepare_pyproject(cwd: Path, project_name: str | None = None) -> PyProject:
     pp = pyproject(cwd).ensure(project_name).add_workspace(WORKSPACE).add_scripts(SCRIPTS).save()
     if WORKSPACE:
-        sh(f"uv add --workspace {' '.join(WORKSPACE)}", cwd=cwd)
+        sh(f"uv add --workspace {quote(WORKSPACE)}", cwd=cwd)
+    if DEPENDENCIES:
+        sh(f"uv add {quote(DEPENDENCIES)}", cwd=cwd)
     if PACKAGES:
-        sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=cwd)
+        sh(f"uv add --dev {quote(PACKAGES)}", cwd=cwd)
     sh("uv sync", cwd=cwd)
     return pp.reload()
 
@@ -55,11 +60,13 @@ CwdArgument = Annotated[Path, typer.Argument(help="Project directory.", resolve_
 app = Typer()
 
 @app.command(help="Hook up dependencies and workspaces correctly.")
+@cli_exception_handler
 def repair(cwd: CwdArgument = Path(".")):
     prepare_pyproject(cwd)
 
 
 @app.command(help="Initialize a new project.")
+@cli_exception_handler
 def init(dest: CwdArgument = Path(".")):
     pyproject(dest).ensure()
     copier.run_copy(COPIER_REPO, str(dest), unsafe=True, answers_file=ANSWERS_FILE)
@@ -67,13 +74,15 @@ def init(dest: CwdArgument = Path(".")):
 
 
 @app.command(help="Update your existing project.")
+@cli_exception_handler
 def update(cwd: CwdArgument = Path(".")):
     require_clean(cwd)
     sh(f"copier update -a {ANSWERS_FILE} --conflict inline --trust --skip-tasks", cwd=cwd)
     repair(cwd)
 
 
-@app.command(help="Destroy and regenerate the committed example project.")
+@app.command(help="Destroy and regenerate the committed example project.", hidden=True)
+@cli_exception_handler
 def example():  # this command explicitly is not meant to update, it just doesn't work. it's already been tried.... sorry... :(
     root = validate_template_root(Path.cwd().resolve())
     dst = root / EXAMPLE_NAME

@@ -2,7 +2,7 @@ COPIER_REPO = "gh:Phazebreak-Coatings-Inc/copier-template"
 """The repo that copier should target."""
 
 ANSWERS_FILE = ".copier-template-answers.yml"
-"""The actual answers file that will be saved after user-interaction. 
+"""The actual answers file that will be saved after user-interaction.
 
 If it has the same name as another copier-template project, your template will break.
 """
@@ -37,6 +37,10 @@ PACKAGES = [
     "pytest>=9.1.1",
     "tomlkit>=0.15.0",
     "typer>=0.26.6",
-    "copier_template>=0.17.0",
 ]
-"""The packages that should be added to the target pyproject."""
+"""The dev packages that should be added to the target pyproject."""
+
+DEPENDENCIES = [
+    "copier-template>=0.1.9",
+]
+"""The runtime packages that should be added to the target pyproject."""
