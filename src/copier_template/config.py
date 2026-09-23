@@ -37,6 +37,10 @@ PACKAGES = [
     "pytest>=9.1.1",
     "tomlkit>=0.15.0",
     "typer>=0.26.6",
-    "copier_template>=0.17.0",
 ]
-"""The packages that should be added to the target pyproject."""
+"""The dev packages that should be added to the target pyproject."""
+
+DEPENDENCIES = [
+    "copier-template>=0.1.9",
+]
+"""The runtime packages that should be added to the target pyproject."""

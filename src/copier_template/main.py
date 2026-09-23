@@ -3,15 +3,17 @@ from pathlib import Path
 from typing import Annotated
 
 import copier
+import tomlkit
 import typer
 from pydantic import BeforeValidator
 from typer import Typer
 
-from copier_template.util import PyProject, e, sh
+from copier_template.util import PyProject, e, quote, sh
 
 from .config import (
     ANSWERS_FILE,
     COPIER_REPO,
+    DEPENDENCIES,
     EXAMPLE_NAME,
     EXAMPLE_PROJECT_NAME,
     PACKAGES,
@@ -46,9 +48,11 @@ def prepare_pyproject(cwd: Path, project_name: str | None = None) -> PyProject:
         .save()
     )
     if WORKSPACE:
-        sh(f"uv add --workspace {' '.join(WORKSPACE)}", cwd=cwd)
+        sh(f"uv add --workspace {quote(WORKSPACE)}", cwd=cwd)
+    if DEPENDENCIES:
+        sh(f"uv add {quote(DEPENDENCIES)}", cwd=cwd)
     if PACKAGES:
-        sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=cwd)
+        sh(f"uv add --dev {quote(PACKAGES)}", cwd=cwd)
     sh("uv sync", cwd=cwd)
     return pp.reload()
 
@@ -106,6 +110,11 @@ def example():  # this command explicitly is not meant to update, it just doesn'
         f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
     )
 
+    pp = pyproject(dst).ensure(EXAMPLE_PROJECT_NAME)
+    source = tomlkit.inline_table()
+    source.update({"path": "..", "editable": True})
+    pp.table("tool", "uv", "sources")["copier-template"] = source
+    pp.save()
     prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
     sh("uv build --all-packages", cwd=dst)
     sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)

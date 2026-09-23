@@ -66,6 +66,10 @@ def sh(
         raise typer.Exit(e.returncode) from None
 
 
+def quote(args) -> str:
+    return " ".join(f'"{a}"' for a in args)
+
+
 def is_terraform_dir(p: Path | str) -> Path:
     if isinstance(p, str):
         p = Path(p)

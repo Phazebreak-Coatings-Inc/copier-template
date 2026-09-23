@@ -10,6 +10,7 @@ import shutil
 from .config import (
     ANSWERS_FILE,
     COPIER_REPO,
+    DEPENDENCIES,
     EXAMPLE_NAME,
     EXAMPLE_PROJECT_NAME,
     PACKAGES,
@@ -19,7 +20,8 @@ from .config import (
 from copier_template.util import (
     PyProject,
     sh,
-    e
+    e,
+    quote,
 )
 
 def validate_template_root(p: str | Path) -> Path:
@@ -38,9 +40,11 @@ def pyproject(cwd: Path) -> PyProject:
 def prepare_pyproject(cwd: Path, project_name: str | None = None) -> PyProject:
     pp = pyproject(cwd).ensure(project_name).add_workspace(WORKSPACE).add_scripts(SCRIPTS).save()
     if WORKSPACE:
-        sh(f"uv add --workspace {' '.join(WORKSPACE)}", cwd=cwd)
+        sh(f"uv add --workspace {quote(WORKSPACE)}", cwd=cwd)
+    if DEPENDENCIES:
+        sh(f"uv add {quote(DEPENDENCIES)}", cwd=cwd)
     if PACKAGES:
-        sh(f"uv add --dev {' '.join(PACKAGES)}", cwd=cwd)
+        sh(f"uv add --dev {quote(PACKAGES)}", cwd=cwd)
     sh("uv sync", cwd=cwd)
     return pp.reload()
 

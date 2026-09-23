@@ -23,7 +23,10 @@ def test_member_is_a_package(name, path):
 
 @pytest.fixture(scope="session")
 def doc():
-    return tomlkit.parse((EXAMPLE / "pyproject.toml").read_text())
+    p = EXAMPLE / "pyproject.toml"
+    if not p.exists():
+        pytest.skip(f"no example at {EXAMPLE}")
+    return tomlkit.parse(p.read_text())
 
 
 GENERATED_AFTER_COPY = {"pyproject.toml", "uv.lock", "dist", ".venv", "src"}
