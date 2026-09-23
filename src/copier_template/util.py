@@ -6,7 +6,7 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Self, cast
-
+import logging
 import inflection
 import tomlkit
 import typer
@@ -25,7 +25,7 @@ from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
 
-def e(func):
+def cli_exception_handler(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
@@ -33,7 +33,7 @@ def e(func):
         except typer.Exit, typer.Abort:
             raise
         except Exception as exc:
-            if os.environ.get("DEBUG"):
+            if logging.getLogger().level == "DEBUG":
                 raise
             typer.secho(str(exc), err=True, fg=typer.colors.RED)
             raise typer.Exit(1)
