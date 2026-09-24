@@ -227,6 +227,13 @@ requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
 
+def normalize(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def requirement_name(req: str) -> str:
+    return normalize(re.split(r"[\s\[<>=!~;@]", req, maxsplit=1)[0])
+
 
 class PyProject(BaseModel):
     cwd: Path
@@ -291,10 +298,26 @@ class PyProject(BaseModel):
             if m not in arr:
                 arr.append(m)
         sources = self.table("tool", "uv", "sources")
-        for name in (n for n in members if n not in sources):
+        existing = {normalize(k) for k in sources}
+        for name in (n for n in members if normalize(n) not in existing):
             it = tomlkit.inline_table()
             it["workspace"] = True
             sources[name] = it
+        return self.add_dependencies(list(members))
+
+    def add_dependencies(self, deps: list[str], group: str | None = None) -> Self:
+        if not deps:
+            return self
+        arr = (
+            self.table("dependency-groups").setdefault(group, tomlkit.array())
+            if group
+            else self.table("project").setdefault("dependencies", tomlkit.array())
+        )
+        existing = {requirement_name(str(d)) for d in arr}
+        for d in deps:
+            if requirement_name(d) not in existing:
+                arr.append(d)
+                existing.add(requirement_name(d))
         return self
 
     @validate_call
@@ -306,6 +329,8 @@ class PyProject(BaseModel):
             table[name] = target
         return self
 
-    def save(self) -> Self:
+    def save(self, sync: bool = True) -> Self:
         self.path.write_text(tomlkit.dumps(self.doc), encoding="utf-8")
+        if sync:
+            sh("uv sync", cwd=self.cwd)
         return self

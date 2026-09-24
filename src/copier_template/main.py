@@ -39,21 +39,15 @@ def pyproject(cwd: Path) -> PyProject:
 
 
 def prepare_pyproject(cwd: Path, project_name: str | None = None) -> PyProject:
-    pp = (
+    return (
         pyproject(cwd)
         .ensure(project_name)
         .add_workspace(WORKSPACE)
+        .add_dependencies(DEPENDENCIES)
+        .add_dependencies(PACKAGES, group="dev")
         .add_scripts(SCRIPTS)
         .save()
     )
-    if WORKSPACE:
-        sh(f"uv add --workspace {quote(WORKSPACE)}", cwd=cwd)
-    if DEPENDENCIES:
-        sh(f"uv add {quote(DEPENDENCIES)}", cwd=cwd)
-    if PACKAGES:
-        sh(f"uv add --dev {quote(PACKAGES)}", cwd=cwd)
-    sh("uv sync", cwd=cwd)
-    return pp.reload()
 
 
 def require_clean(cwd: Path) -> None:

@@ -261,7 +261,7 @@ class TestPyProject:
         pp = PyProject(cwd=tmp_path).create("app")
         pp.add_workspace({"core": "libs/core"}).add_workspace(
             {"core": "libs/core"}
-        ).save()
+        ).save(sync=False)
         data = tomlkit.parse((tmp_path / "pyproject.toml").read_text()).unwrap()
         assert data["tool"]["uv"]["workspace"]["members"] == ["libs/core"]
         assert data["tool"]["uv"]["sources"]["core"] == {"workspace": True}
@@ -275,7 +275,7 @@ class TestPyProject:
         )
         PyProject(cwd=tmp_path).add_workspace(
             {"core": "libs/core", "new": "libs/new"}
-        ).save()
+        ).save(sync=False)
         text = (tmp_path / "pyproject.toml").read_text()
         data = tomlkit.parse(text).unwrap()
         assert data["tool"]["uv"]["workspace"]["members"] == [
