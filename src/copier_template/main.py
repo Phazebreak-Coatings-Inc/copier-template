@@ -8,7 +8,7 @@ import typer
 from pydantic import BeforeValidator
 from typer import Typer
 
-from copier_template.util import PyProject, cli_exception_handler, quote, sh
+from copier_template.util import PyProject, cli_exception_handler, sh
 
 from .config import (
     ANSWERS_FILE,

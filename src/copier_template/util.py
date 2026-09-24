@@ -227,6 +227,7 @@ requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
 
+
 def normalize(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
@@ -302,8 +303,8 @@ class PyProject(BaseModel):
         for name in (n for n in members if normalize(n) not in existing):
             it = tomlkit.inline_table()
             it["workspace"] = True
-            sources[name] = it
-        return self.add_dependencies(list(members))
+            sources[normalize(name)] = it
+        return self.add_dependencies([normalize(n) for n in members])
 
     def add_dependencies(self, deps: list[str], group: str | None = None) -> Self:
         if not deps:

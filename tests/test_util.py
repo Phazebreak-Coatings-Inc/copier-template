@@ -315,3 +315,74 @@ class TestPyProject:
             '[tool.uv.workspace]\nmembers = ["a"]\n'
         )
         assert PyProject(cwd=tmp_path).project is None
+
+    def test_add_workspace_normalizes_and_adds_dependencies(self, tmp_path):
+        pp = PyProject(cwd=tmp_path).create("app")
+        pp.add_workspace({"database_core": "libs/core"}).save(sync=False)
+        data = tomlkit.parse(pp.path.read_text()).unwrap()
+        assert data["tool"]["uv"]["sources"]["database-core"] == {"workspace": True}
+        assert data["project"]["dependencies"] == ["database-core"]
+
+    def test_add_workspace_skips_existing_underscore_source(self, tmp_path):
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "app"\n\n'
+            "[tool.uv.sources]\ndatabase_core = { workspace = true }\n"
+        )
+        PyProject(cwd=tmp_path).add_workspace({"database_core": "libs/core"}).save(
+            sync=False
+        )
+        sources = tomlkit.parse((tmp_path / "pyproject.toml").read_text()).unwrap()[
+            "tool"
+        ]["uv"]["sources"]
+        assert list(sources) == ["database_core"]
+
+    def test_add_dependencies_keeps_existing_pin(self, tmp_path):
+        pp = PyProject(cwd=tmp_path).create("app")
+        pp.add_dependencies(["Typer>=0.1"]).add_dependencies(
+            ["typer>=0.26", "rich"]
+        ).save(sync=False)
+        assert pp.reload().doc.unwrap()["project"]["dependencies"] == [
+            "Typer>=0.1",
+            "rich",
+        ]
+
+    def test_add_dependencies_to_group(self, tmp_path):
+        pp = PyProject(cwd=tmp_path).create("app")
+        pp.add_dependencies(["pytest>=9", "psycopg[binary]>=3"], group="dev").save(
+            sync=False
+        )
+        data = pp.reload().doc.unwrap()
+        assert data["dependency-groups"]["dev"] == ["pytest>=9", "psycopg[binary]>=3"]
+        assert data["project"]["dependencies"] == []
+
+    def test_save_sync_runs_uv_sync(self, tmp_path, fake_sh):
+        pp = PyProject(cwd=tmp_path).create("app")
+        pp.save(sync=True)
+        assert fake_sh.calls[-1][0] == "uv sync"
+        assert fake_sh.calls[-1][1]["cwd"] == tmp_path
+
+    def test_save_without_sync_runs_nothing(self, tmp_path, fake_sh):
+        PyProject(cwd=tmp_path).create("app").save(sync=False)
+        assert fake_sh.calls == []
+
+
+class TestNames:
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [("database_core", "database-core"), ("Foo.Bar", "foo-bar"), ("a__b", "a-b")],
+    )
+    def test_normalize(self, raw, expected):
+        assert util.normalize(raw) == expected
+
+    @pytest.mark.parametrize(
+        "req, expected",
+        [
+            ("psycopg[binary]>=3.3.4", "psycopg"),
+            ("typer>=0.26", "typer"),
+            ("Database_Util", "database-util"),
+            ("pkg ; python_version>'3'", "pkg"),
+            ("pkg @ https://x/y.whl", "pkg"),
+        ],
+    )
+    def test_requirement_name(self, req, expected):
+        assert util.requirement_name(req) == expected
