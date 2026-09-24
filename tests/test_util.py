@@ -326,20 +326,31 @@ class TestPyProject:
     def test_add_workspace_skips_existing_underscore_source(self, tmp_path):
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "app"\n\n'
-            '[tool.uv.sources]\ndatabase_core = { workspace = true }\n'
+            "[tool.uv.sources]\ndatabase_core = { workspace = true }\n"
         )
-        PyProject(cwd=tmp_path).add_workspace({"database_core": "libs/core"}).save(sync=False)
-        sources = tomlkit.parse((tmp_path / "pyproject.toml").read_text()).unwrap()["tool"]["uv"]["sources"]
+        PyProject(cwd=tmp_path).add_workspace({"database_core": "libs/core"}).save(
+            sync=False
+        )
+        sources = tomlkit.parse((tmp_path / "pyproject.toml").read_text()).unwrap()[
+            "tool"
+        ]["uv"]["sources"]
         assert list(sources) == ["database_core"]
 
     def test_add_dependencies_keeps_existing_pin(self, tmp_path):
         pp = PyProject(cwd=tmp_path).create("app")
-        pp.add_dependencies(["Typer>=0.1"]).add_dependencies(["typer>=0.26", "rich"]).save(sync=False)
-        assert pp.reload().doc.unwrap()["project"]["dependencies"] == ["Typer>=0.1", "rich"]
+        pp.add_dependencies(["Typer>=0.1"]).add_dependencies(
+            ["typer>=0.26", "rich"]
+        ).save(sync=False)
+        assert pp.reload().doc.unwrap()["project"]["dependencies"] == [
+            "Typer>=0.1",
+            "rich",
+        ]
 
     def test_add_dependencies_to_group(self, tmp_path):
         pp = PyProject(cwd=tmp_path).create("app")
-        pp.add_dependencies(["pytest>=9", "psycopg[binary]>=3"], group="dev").save(sync=False)
+        pp.add_dependencies(["pytest>=9", "psycopg[binary]>=3"], group="dev").save(
+            sync=False
+        )
         data = pp.reload().doc.unwrap()
         assert data["dependency-groups"]["dev"] == ["pytest>=9", "psycopg[binary]>=3"]
         assert data["project"]["dependencies"] == []
@@ -353,6 +364,7 @@ class TestPyProject:
     def test_save_without_sync_runs_nothing(self, tmp_path, fake_sh):
         PyProject(cwd=tmp_path).create("app").save(sync=False)
         assert fake_sh.calls == []
+
 
 class TestNames:
     @pytest.mark.parametrize(

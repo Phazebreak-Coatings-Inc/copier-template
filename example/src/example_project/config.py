@@ -44,4 +44,3 @@ PACKAGES = [
 
 DEPENDENCIES: list[str] = []
 """The runtime packages that should be added to the target pyproject."""
-

@@ -227,6 +227,7 @@ requires = ["uv_build>=0.11.18,<0.12"]
 build-backend = "uv_build"
 """
 
+
 def normalize(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
