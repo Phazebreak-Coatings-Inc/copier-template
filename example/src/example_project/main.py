@@ -2,10 +2,17 @@ from pathlib import Path
 from typing import Annotated
 
 import copier
+import shutil
+from pathlib import Path
+from typing import Annotated
+
+import copier
+import tomlkit
 import typer
 from pydantic import BeforeValidator
 from typer import Typer
-import shutil
+
+from copier_template.util import PyProject, cli_exception_handler, quote, sh
 
 from .config import (
     ANSWERS_FILE,
@@ -17,12 +24,7 @@ from .config import (
     SCRIPTS,
     WORKSPACE,
 )
-from copier_template.util import (
-    PyProject,
-    sh,
-    cli_exception_handler,
-    quote,
-)
+
 
 def validate_template_root(p: str | Path) -> Path:
     if isinstance(p, str):
@@ -32,21 +34,25 @@ def validate_template_root(p: str | Path) -> Path:
         raise typer.Exit(1)
     return p
 
+
 TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
 
+
 def pyproject(cwd: Path) -> PyProject:
-    return PyProject(cwd=cwd) #template is already passed
+    return PyProject(cwd=cwd)  # template is already passed
+
 
 def prepare_pyproject(cwd: Path, project_name: str | None = None) -> PyProject:
-    pp = pyproject(cwd).ensure(project_name).add_workspace(WORKSPACE).add_scripts(SCRIPTS).save()
-    if WORKSPACE:
-        sh(f"uv add --workspace {quote(WORKSPACE)}", cwd=cwd)
-    if DEPENDENCIES:
-        sh(f"uv add {quote(DEPENDENCIES)}", cwd=cwd)
-    if PACKAGES:
-        sh(f"uv add --dev {quote(PACKAGES)}", cwd=cwd)
-    sh("uv sync", cwd=cwd)
-    return pp.reload()
+    return (
+        pyproject(cwd)
+        .ensure(project_name)
+        .add_workspace(WORKSPACE)
+        .add_dependencies(DEPENDENCIES)
+        .add_dependencies(PACKAGES, group="dev")
+        .add_scripts(SCRIPTS)
+        .save()
+    )
+
 
 def require_clean(cwd: Path) -> None:
     r = sh("git status --porcelain", cwd=cwd, silent=True, check=False)
@@ -55,9 +61,12 @@ def require_clean(cwd: Path) -> None:
         raise typer.Exit(1)
 
 
-CwdArgument = Annotated[Path, typer.Argument(help="Project directory.", resolve_path=True)]
+CwdArgument = Annotated[
+    Path, typer.Argument(help="Project directory.", resolve_path=True)
+]
 
 app = Typer()
+
 
 @app.command(help="Hook up dependencies and workspaces correctly.")
 @cli_exception_handler
@@ -77,7 +86,10 @@ def init(dest: CwdArgument = Path(".")):
 @cli_exception_handler
 def update(cwd: CwdArgument = Path(".")):
     require_clean(cwd)
-    sh(f"copier update -a {ANSWERS_FILE} --conflict inline --trust --skip-tasks", cwd=cwd)
+    sh(
+        f"copier update -a {ANSWERS_FILE} --conflict inline --trust --skip-tasks",
+        cwd=cwd,
+    )
     repair(cwd)
 
 
@@ -95,6 +107,11 @@ def example():  # this command explicitly is not meant to update, it just doesn'
         f"uv run python -m copier copy {root} {dst} --trust --vcs-ref=HEAD -d project_name={EXAMPLE_PROJECT_NAME} --skip-tasks"
     )
 
+    pp = pyproject(dst).ensure(EXAMPLE_PROJECT_NAME)
+    source = tomlkit.inline_table()
+    source.update({"path": "..", "editable": True})
+    pp.table("tool", "uv", "sources")["copier-template"] = source
+    pp.save()
     prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
     sh("uv build --all-packages", cwd=dst)
     sh('uv run pytest tests/test_example.py -m "not slow"', cwd=root)
