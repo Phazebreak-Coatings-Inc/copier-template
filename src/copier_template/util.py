@@ -5,7 +5,7 @@ import re
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Self, cast
+from typing import Annotated, Any, Self, cast
 
 import inflection
 import tomlkit
@@ -14,17 +14,14 @@ from pydantic import (
     BaseModel,
     BeforeValidator,
     ConfigDict,
+    Field,
     JsonValue,
     PrivateAttr,
     Secret,
     StringConstraints,
     model_validator,
     validate_call,
-    Field,
-    AliasChoices
 )
-from typing import Any
-from pydantic_settings import BaseSettings
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
@@ -107,6 +104,7 @@ class TerraformOutput(BaseModel):
 
 TF_ENV_ALLOWLIST = {"LOGFIRE_API_KEY"}
 
+
 def are_valid_tf_vars(t: dict[str, JsonValue | Secret[JsonValue]]) -> dict:
     bad = sorted(k for k in t if not k.startswith("TF_") and k not in TF_ENV_ALLOWLIST)
     if bad:
@@ -149,10 +147,12 @@ def tf_env(settings: BaseModel, **overrides: Any) -> dict[str, str]:
             env[key] = to_env_value(value)
     return env
 
-class TFSettingsMixin():
+
+class TFSettingsMixin:
     @validate_call(validate_return=True)
     def tf_env(self, **overrides) -> TFVars:
-        return tf_env(self, **overrides) #type: ignore
+        return tf_env(self, **overrides)  # type: ignore
+
 
 class TerraformModule[OutputsShape: Mapping = Mapping](BaseModel):
     tf_vars: TFVars
