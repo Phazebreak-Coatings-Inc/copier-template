@@ -152,7 +152,7 @@ def tf_env(settings: BaseModel, **overrides: Any) -> dict[str, str]:
 class TFSettingsMixin():
     @validate_call(validate_return=True)
     def tf_env(self, **overrides) -> TFVars:
-        return cast(TFVars, tf_env(**overrides))
+        return tf_env(self, **overrides) #type: ignore
 
 class TerraformModule[OutputsShape: Mapping = Mapping](BaseModel):
     tf_vars: TFVars
