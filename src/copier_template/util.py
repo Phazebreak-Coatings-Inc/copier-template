@@ -5,7 +5,7 @@ import re
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Self, cast
+from typing import Annotated, Any, Self, cast
 
 import inflection
 import tomlkit
@@ -14,6 +14,7 @@ from pydantic import (
     BaseModel,
     BeforeValidator,
     ConfigDict,
+    Field,
     JsonValue,
     PrivateAttr,
     Secret,
@@ -101,9 +102,15 @@ class TerraformOutput(BaseModel):
         return self.value  # if on accident
 
 
-def are_valid_tf_vars(t: dict[str, JsonValue | Secret[JsonValue]]) -> TFVars:
-    if bad := sorted(k for k in t if not k.startswith("TF_")):
-        raise ValueError(f"Keys passed to tf vars must start with 'TF_': {bad}")
+TF_ENV_ALLOWLIST = {"LOGFIRE_API_KEY"}
+
+
+def are_valid_tf_vars(t: dict[str, JsonValue | Secret[JsonValue]]) -> dict:
+    bad = sorted(k for k in t if not k.startswith("TF_") and k not in TF_ENV_ALLOWLIST)
+    if bad:
+        raise ValueError(
+            f"Keys must start with 'TF_' or be one of {sorted(TF_ENV_ALLOWLIST)}: {bad}"
+        )
     return t
 
 
@@ -112,10 +119,39 @@ TFVars = Annotated[
 ]
 
 
-def to_env_value(v: JsonValue | Secret[JsonValue]) -> str:
-    if isinstance(v, Secret):
+def TFVar(tf: str, **kwargs: Any) -> Any:
+    return Field(default=None, json_schema_extra={"tf": tf}, **kwargs)
+
+
+def TFSecret(tf: str, **kwargs: Any) -> Any:
+    return TFVar(tf, repr=False, **kwargs)
+
+
+def to_env_value(v: Any) -> str:
+    if hasattr(v, "get_secret_value"):
         v = v.get_secret_value()
     return v if isinstance(v, str) else json.dumps(v)
+
+
+def tf_env(settings: BaseModel, **overrides: Any) -> dict[str, str]:
+    values = {}
+    for name, f in type(settings).model_fields.items():
+        extra = f.json_schema_extra
+        if isinstance(extra, dict) and "tf" in extra:
+            values[extra["tf"]] = getattr(settings, name)
+    values.update(overrides)
+
+    env = {}
+    for key, value in values.items():
+        if value not in (None, ""):
+            env[key] = to_env_value(value)
+    return env
+
+
+class TFSettingsMixin:
+    @validate_call(validate_return=True)
+    def tf_env(self, **overrides) -> TFVars:
+        return tf_env(self, **overrides)  # type: ignore
 
 
 class TerraformModule[OutputsShape: Mapping = Mapping](BaseModel):
