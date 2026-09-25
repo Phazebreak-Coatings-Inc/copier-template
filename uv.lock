@@ -55,7 +55,7 @@ wheels = [
 
 [[package]]
 name = "copier-template"
-version = "0.1.10.post2"
+version = "0.1.11"
 source = { editable = "." }
 dependencies = [
     { name = "copier" },
