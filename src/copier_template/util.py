@@ -1,6 +1,5 @@
 import functools
 import json
-import logging
 import os
 import re
 import subprocess
@@ -34,7 +33,7 @@ def cli_exception_handler(func):
         except typer.Exit, typer.Abort:
             raise
         except Exception as exc:
-            if logging.getLogger().level == "DEBUG":
+            if os.environ.get("DEBUG"):
                 raise
             typer.secho(str(exc), err=True, fg=typer.colors.RED)
             raise typer.Exit(1)
