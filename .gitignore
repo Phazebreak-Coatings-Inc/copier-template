@@ -4,8 +4,7 @@ __pycache__/
 *$py.class
 
 # example
-example/.venv/
-example/uv.lock
+example/
 
 # C extensions
 *.so
