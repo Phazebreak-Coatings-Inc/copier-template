@@ -15,6 +15,12 @@ def git(cwd: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 
 
+def git_out(cwd: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
 def init_repo(path: Path) -> None:
     git(path, "init", "-q", "-b", "main")
     git(path, "config", "user.email", "test@example.com")
@@ -115,3 +121,40 @@ def test_init_local_then_official_update(monkeypatch, tmp_path, template, publis
     assert (dst / "added.txt").read_text(encoding="utf-8") == "new\n"
     answers = yaml.safe_load((dst / ANSWERS_FILE).read_text(encoding="utf-8"))
     assert answers["_commit"] == "v0.2.0"
+
+
+@pytest.mark.slow
+def test_update_local_merges_into_edited_files(template, published, project):
+    (template / "template" / "hello.txt").write_text("a\nb\nc\n", encoding="utf-8")
+    commit(template, "three lines")
+    git(template, "tag", "v0.1.1")
+    git(published, "pull", "-q", "--tags", "origin", "main")
+    result = runner.invoke(
+        main.app, ["update", str(project), "--official", "--defaults"]
+    )
+    assert result.exit_code == 0, result.output
+    (project / "hello.txt").write_text("A\nb\nc\n", encoding="utf-8")
+    commit(project, "edit")
+    (template / "template" / "hello.txt").write_text("a\nb\nC\n", encoding="utf-8")
+
+    result = runner.invoke(main.app, ["update", str(project), "--local", "--defaults"])
+
+    assert result.exit_code == 0, result.output
+    assert (project / "hello.txt").read_text(encoding="utf-8") == "A\nb\nC\n"
+
+
+@pytest.mark.slow
+def test_update_local_conflict_restores_history(template, published, project):
+    answers = (project / ANSWERS_FILE).read_text(encoding="utf-8")
+    (project / "hello.txt").write_text("project\n", encoding="utf-8")
+    commit(project, "edit")
+    head = git_out(project, "rev-parse", "HEAD")
+    (template / "template" / "hello.txt").write_text("template\n", encoding="utf-8")
+
+    result = runner.invoke(main.app, ["update", str(project), "--local", "--defaults"])
+
+    assert result.exit_code == 0, result.output
+    assert "<<<<<<<" in (project / "hello.txt").read_text(encoding="utf-8")
+    assert git_out(project, "rev-parse", "HEAD") == head
+    assert (project / ANSWERS_FILE).read_text(encoding="utf-8") == answers
+    assert ANSWERS_FILE not in git_out(project, "status", "--porcelain")
