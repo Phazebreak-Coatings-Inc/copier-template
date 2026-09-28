@@ -4,7 +4,8 @@ import subprocess
 import pytest
 import tomlkit
 import typer
-from pydantic import Secret, TypeAdapter, ValidationError
+from pydantic import BaseModel, Secret, SecretStr, TypeAdapter, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from copier_template import util
 from copier_template.util import (
@@ -16,8 +17,13 @@ from copier_template.util import (
     TerraformModule,
     TerraformOutput,
     TerraformOutputError,
+    TFSecret,
+    TFSettingsMixin,
+    TFVar,
     cli_exception_handler,
     sh,
+    tf_env,
+    to_env_value,
 )
 
 OUTPUTS = json.dumps(
@@ -386,3 +392,94 @@ class TestNames:
     )
     def test_requirement_name(self, req, expected):
         assert util.requirement_name(req) == expected
+
+
+class Settings(TFSettingsMixin, BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="TEST_", extra="ignore")
+
+    workspace: str | None = TFVar("TF_WORKSPACE")
+    token: SecretStr | None = TFSecret("TF_VAR_token")
+    api_key: SecretStr | None = TFSecret("LOGFIRE_API_KEY")
+    enabled: bool | None = TFVar("TF_VAR_enabled")
+    count: int | None = TFVar("TF_VAR_count")
+    tags: dict | None = TFVar("TF_VAR_tags")
+    untagged: str | None = None
+
+
+class TestToEnvValue:
+    def test_string_unchanged(self):
+        assert to_env_value("x") == "x"
+
+    def test_secret_unwrapped(self):
+        assert to_env_value(SecretStr("s3cret")) == "s3cret"
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [(False, "false"), (0, "0"), ({"a": 1}, '{"a": 1}'), (["a"], '["a"]')],
+    )
+    def test_non_strings_are_json(self, value, expected):
+        assert to_env_value(value) == expected
+
+
+class TestTFEnv:
+    def test_maps_tagged_fields(self):
+        s = Settings(workspace="ws", token="t", api_key="k")
+        assert tf_env(s) == {
+            "TF_WORKSPACE": "ws",
+            "TF_VAR_token": "t",
+            "LOGFIRE_API_KEY": "k",
+        }
+
+    def test_skips_untagged_fields(self):
+        assert tf_env(Settings(untagged="x")) == {}
+
+    def test_drops_none_and_empty(self):
+        assert tf_env(Settings(workspace="")) == {}
+
+    def test_keeps_falsy_values(self):
+        s = Settings(enabled=False, count=0)
+        assert tf_env(s) == {"TF_VAR_enabled": "false", "TF_VAR_count": "0"}
+
+    def test_json_encodes_structures(self):
+        assert tf_env(Settings(tags={"a": 1})) == {"TF_VAR_tags": '{"a": 1}'}
+
+    def test_overrides_add_keys(self):
+        assert tf_env(Settings(), TF_VAR_project_name="p") == {
+            "TF_VAR_project_name": "p"
+        }
+
+    def test_overrides_win(self):
+        assert tf_env(Settings(workspace="ws"), TF_WORKSPACE="ws-prod") == {
+            "TF_WORKSPACE": "ws-prod"
+        }
+
+    def test_reads_environment(self, monkeypatch):
+        monkeypatch.setenv("TEST_TOKEN", "from-env")
+        assert tf_env(Settings()) == {"TF_VAR_token": "from-env"}
+
+    def test_works_on_plain_models(self):
+        class Plain(BaseModel):
+            name: str | None = TFVar("TF_VAR_name")
+
+        assert tf_env(Plain(name="n")) == {"TF_VAR_name": "n"}
+
+
+class TestTFSecret:
+    def test_hidden_from_repr(self):
+        s = Settings(workspace="ws", token="t", api_key="k")
+        assert "ws" in repr(s)
+        assert "token" not in repr(s)
+        assert "api_key" not in repr(s)
+
+
+class TestTFSettingsMixin:
+    def test_matches_function(self):
+        s = Settings(workspace="ws", token="t", api_key="k")
+        assert s.tf_env(TF_VAR_project_name="p") == tf_env(s, TF_VAR_project_name="p")
+
+    def test_allows_allowlisted_key(self):
+        assert Settings(api_key="k").tf_env() == {"LOGFIRE_API_KEY": "k"}
+
+    def test_rejects_unknown_key(self):
+        with pytest.raises(ValidationError):
+            Settings().tf_env(NOT_TF="x")
