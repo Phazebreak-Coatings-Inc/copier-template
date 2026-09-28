@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import tomlkit
 import typer
 import yaml
 from typer.testing import CliRunner
@@ -360,3 +361,29 @@ class TestExample:
         result = runner.invoke(main.app, ["example"])
         assert result.exit_code == 1
         assert "Run from the template repo root." in result.output
+
+    def test_sources_the_template_repo_by_its_own_name(self, monkeypatch, tmp_path):
+        from copier_template import util
+
+        root = tmp_path / "alembic-environment"
+        root.mkdir()
+        (root / "copier.yml").write_text("_subdirectory: template\n", encoding="utf-8")
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "alembic-environment"\nversion = "0.3.1"\n',
+            encoding="utf-8",
+        )
+        commands: list[str] = []
+        monkeypatch.setattr(main, "sh", lambda cmd, **kw: commands.append(cmd))
+        monkeypatch.setattr(util, "sh", lambda cmd, **kw: commands.append(cmd))
+        monkeypatch.setattr(main, "prepare_pyproject", lambda *a: None)
+        monkeypatch.chdir(root)
+
+        result = runner.invoke(main.app, ["example"])
+
+        assert result.exit_code == 0, result.output
+        sources = tomlkit.parse(
+            (root / main.EXAMPLE_NAME / "pyproject.toml").read_text(encoding="utf-8")
+        )["tool"]["uv"]["sources"]
+        assert dict(sources) == {
+            "alembic-environment": {"path": "..", "editable": True}
+        }
