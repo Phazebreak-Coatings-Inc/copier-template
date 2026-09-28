@@ -63,15 +63,20 @@ def local_template() -> Path:
     return root
 
 
-def set_src_path(cwd: Path, src: str) -> None:
+def set_answers(cwd: Path, **values: str) -> None:
     path = cwd / ANSWERS_FILE
     answers = yaml.safe_load(path.read_text(encoding="utf-8"))
-    answers["_src_path"] = src
+    answers.update(values)
     path.write_text(yaml.safe_dump(answers, sort_keys=False), encoding="utf-8")
 
 
+def latest_tag(template: Path) -> str | None:
+    r = sh("git describe --tags --abbrev=0", cwd=template, silent=True, check=False)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
 @contextmanager
-def restored_answers(cwd: Path):
+def restored_answers(cwd: Path, template: Path):
     path = cwd / ANSWERS_FILE
     original = path.read_text(encoding="utf-8") if path.exists() else None
     try:
@@ -80,7 +85,17 @@ def restored_answers(cwd: Path):
         if original is not None:
             path.write_text(original, encoding="utf-8")
         elif path.exists():
-            set_src_path(cwd, COPIER_REPO)
+            values = {"_src_path": COPIER_REPO}
+            if tag := latest_tag(template):
+                values["_commit"] = tag
+            else:
+                typer.secho(
+                    f"No tag found in {template}. Set _commit in {ANSWERS_FILE} "
+                    "to a published tag before running an official update.",
+                    fg=typer.colors.YELLOW,
+                    err=True,
+                )
+            set_answers(cwd, **values)
 
 
 CwdArgument = Annotated[
@@ -108,7 +123,7 @@ def repair(cwd: CwdArgument = Path(".")):
 def init(dest: CwdArgument = Path("."), local: LocalOption = False):
     template = local_template() if local else None
     pyproject(dest).ensure()
-    with restored_answers(dest) if template else nullcontext():
+    with restored_answers(dest, template) if template else nullcontext():
         copier.run_copy(
             str(template or COPIER_REPO),
             str(dest),
@@ -137,7 +152,7 @@ def run_update(cwd: Path, template: Path | None) -> None:
 @cli_exception_handler
 def update(cwd: CwdArgument = Path("."), local: LocalOption = False):
     template = local_template() if local else None
-    with restored_answers(cwd) if template else nullcontext():
+    with restored_answers(cwd, template) if template else nullcontext():
         run_update(cwd, template)
     repair(cwd)
 

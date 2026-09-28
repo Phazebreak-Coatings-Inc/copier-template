@@ -27,6 +27,11 @@ def commit(path: Path, message: str) -> None:
     git(path, "commit", "-q", "-m", message)
 
 
+class FakePyProject:
+    def ensure(self, *a):
+        return self
+
+
 @pytest.fixture
 def template(tmp_path, monkeypatch):
     root = tmp_path / "template"
@@ -79,3 +84,34 @@ def test_update_local_uses_uncommitted_template_changes(template, published, pro
     assert (project / "hello.txt").read_text(encoding="utf-8") == "v2\n"
     assert (project / ANSWERS_FILE).read_text(encoding="utf-8") == answers
     assert yaml.safe_load(answers)["_commit"] == "v0.1.0"
+
+
+@pytest.mark.slow
+def test_init_local_then_official_update(monkeypatch, tmp_path, template, published):
+    monkeypatch.setattr(main, "COPIER_REPO", str(published))
+    monkeypatch.setattr(main, "pyproject", lambda cwd: FakePyProject())
+    (template / "template" / "hello.txt").write_text("local\n", encoding="utf-8")
+    dst = tmp_path / "fresh"
+
+    result = runner.invoke(main.app, ["init", str(dst), "--local"])
+
+    assert result.exit_code == 0, result.output
+    assert (dst / "hello.txt").read_text(encoding="utf-8") == "local\n"
+    answers = yaml.safe_load((dst / ANSWERS_FILE).read_text(encoding="utf-8"))
+    assert answers["_src_path"] == str(published)
+    assert answers["_commit"] == "v0.1.0"
+
+    init_repo(dst)
+    commit(dst, "generated")
+    git(template, "checkout", "--", ".")
+    (template / "template" / "added.txt").write_text("new\n", encoding="utf-8")
+    commit(template, "v2")
+    git(template, "tag", "v0.2.0")
+    git(published, "pull", "-q", "--tags", "origin", "main")
+
+    result = runner.invoke(main.app, ["update", str(dst), "--official"])
+
+    assert result.exit_code == 0, result.output
+    assert (dst / "added.txt").read_text(encoding="utf-8") == "new\n"
+    answers = yaml.safe_load((dst / ANSWERS_FILE).read_text(encoding="utf-8"))
+    assert answers["_commit"] == "v0.2.0"
