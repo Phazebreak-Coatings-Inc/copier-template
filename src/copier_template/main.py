@@ -1,10 +1,12 @@
 import shutil
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Annotated
 
 import copier
 import tomlkit
 import typer
+import yaml
 from pydantic import BeforeValidator
 from typer import Typer
 
@@ -35,7 +37,7 @@ TemplateRoot = Annotated[Path, BeforeValidator(validate_template_root)]
 
 
 def pyproject(cwd: Path) -> PyProject:
-    return PyProject(cwd=cwd)  # template is already passed
+    return PyProject(cwd=cwd)
 
 
 def prepare_pyproject(cwd: Path, project_name: str | None = None) -> PyProject:
@@ -50,15 +52,45 @@ def prepare_pyproject(cwd: Path, project_name: str | None = None) -> PyProject:
     )
 
 
-def require_clean(cwd: Path) -> None:
-    r = sh("git status --porcelain", cwd=cwd, silent=True, check=False)
-    if r.stdout.strip():
-        typer.secho("Commit or stash changes before updating.", fg=typer.colors.YELLOW)
-        raise typer.Exit(1)
+def local_template() -> Path:
+    root = Path(__file__).resolve().parents[2]
+    if not (root / "copier.yml").exists():
+        raise typer.BadParameter(
+            "--local needs this package installed from a local template checkout "
+            "(an editable path source), not from PyPI."
+        )
+    return root
+
+
+def set_src_path(cwd: Path, src: str) -> None:
+    path = cwd / ANSWERS_FILE
+    answers = yaml.safe_load(path.read_text(encoding="utf-8"))
+    answers["_src_path"] = src
+    path.write_text(yaml.safe_dump(answers, sort_keys=False), encoding="utf-8")
+
+
+@contextmanager
+def restored_answers(cwd: Path):
+    path = cwd / ANSWERS_FILE
+    original = path.read_text(encoding="utf-8") if path.exists() else None
+    try:
+        yield
+    finally:
+        if original is not None:
+            path.write_text(original, encoding="utf-8")
+        elif path.exists():
+            set_src_path(cwd, COPIER_REPO)
 
 
 CwdArgument = Annotated[
     Path, typer.Argument(help="Project directory.", resolve_path=True)
+]
+LocalOption = Annotated[
+    bool,
+    typer.Option(
+        "--local/--official",
+        help="Use the local template checkout, including uncommitted changes, instead of the published release.",
+    ),
 ]
 
 app = Typer()
@@ -72,20 +104,36 @@ def repair(cwd: CwdArgument = Path(".")):
 
 @app.command(help="Initialize a new project.")
 @cli_exception_handler
-def init(dest: CwdArgument = Path(".")):
+def init(dest: CwdArgument = Path("."), local: LocalOption = False):
+    template = local_template() if local else None
     pyproject(dest).ensure()
-    copier.run_copy(COPIER_REPO, str(dest), unsafe=True, answers_file=ANSWERS_FILE)
+    with restored_answers(dest) if template else nullcontext():
+        copier.run_copy(
+            str(template or COPIER_REPO),
+            str(dest),
+            vcs_ref="HEAD" if template else None,
+            unsafe=True,
+            answers_file=ANSWERS_FILE,
+        )
     repair(dest)
 
 
 @app.command(help="Update your existing project.")
 @cli_exception_handler
-def update(cwd: CwdArgument = Path(".")):
-    require_clean(cwd)
-    sh(
-        f"copier update -a {ANSWERS_FILE} --conflict inline --trust --skip-tasks",
-        cwd=cwd,
-    )
+def update(cwd: CwdArgument = Path("."), local: LocalOption = False):
+    template = local_template() if local else None
+    with restored_answers(cwd) if template else nullcontext():
+        if template:
+            set_src_path(cwd, str(template))
+        copier.run_update(
+            str(cwd),
+            answers_file=ANSWERS_FILE,
+            vcs_ref="HEAD" if template else None,
+            overwrite=True,
+            conflict="inline",
+            unsafe=True,
+            skip_tasks=True,
+        )
     repair(cwd)
 
 
