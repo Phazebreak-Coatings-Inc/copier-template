@@ -97,39 +97,47 @@ def copied(monkeypatch):
 
 
 @pytest.fixture
-def worker(monkeypatch):
-    class FakeWorker:
-        calls: list[dict] = []
-        error: Exception | None = None
+def updated(monkeypatch):
+    calls: list[dict] = []
+    error: list[Exception] = []
 
-        def __init__(self, **kwargs):
-            self.kwargs = kwargs
+    def fake(dst, **kwargs):
+        path = Path(dst) / ANSWERS_FILE
+        calls.append({"dst": dst, "answers": read_answers(Path(dst)), **kwargs})
+        answers = read_answers(Path(dst))
+        answers["_commit"] = "tmp"
+        path.write_text(yaml.safe_dump(answers, sort_keys=False), encoding="utf-8")
+        if error:
+            raise error[0]
 
-        def __enter__(self):
-            return self
+    monkeypatch.setattr(main.copier, "run_update", fake)
+    fake.calls = calls
+    fake.error = error
+    return fake
 
-        def __exit__(self, *exc):
-            return False
 
-        def run_update(self):
-            FakeWorker.calls.append(self.kwargs)
-            dst = self.kwargs["dst_path"]
-            if self.kwargs["src_path"]:
-                write_answers(
-                    dst,
-                    {
-                        **PUBLISHED,
-                        "_src_path": self.kwargs["src_path"],
-                        "_commit": "tmp",
-                    },
-                )
-            if FakeWorker.error:
-                raise FakeWorker.error
+@pytest.fixture
+def git_project(project):
+    git(project, "init", "-q", "-b", "main")
+    git(project, "config", "user.email", "test@example.com")
+    git(project, "config", "user.name", "test")
+    git(project, "config", "commit.gpgsign", "false")
+    write_answers(project, PUBLISHED)
+    git(project, "add", "-A")
+    git(project, "commit", "-q", "-m", "generated")
+    return project
 
-    FakeWorker.calls = []
-    FakeWorker.error = None
-    monkeypatch.setattr(main, "Worker", FakeWorker)
-    return FakeWorker
+
+def head(cwd: Path) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=cwd, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def porcelain(cwd: Path) -> str:
+    return subprocess.run(
+        ["git", "status", "--porcelain"], cwd=cwd, capture_output=True, text=True
+    ).stdout
 
 
 class TestValidateTemplateRoot:
@@ -280,21 +288,15 @@ class TestInit:
 
 
 class TestUpdate:
-    def test_defaults(self, project, worker, repaired):
-        write_answers(project, PUBLISHED)
-        result = runner.invoke(main.app, ["update", str(project), "--defaults"])
-        assert result.exit_code == 0, result.output
-        assert worker.calls[0]["defaults"] is True
-
-    def test_official(self, project, worker, repaired):
+    def test_official(self, project, updated, repaired):
         write_answers(project, PUBLISHED)
         result = runner.invoke(main.app, ["update", str(project)])
         assert result.exit_code == 0, result.output
-        call = worker.calls[0]
-        assert call["src_path"] is None
+        call = updated.calls[0]
+        assert call["dst"] == str(project)
+        assert call["answers"]["_src_path"] == COPIER_REPO
+        assert call["answers_file"] == ANSWERS_FILE
         assert call["vcs_ref"] is None
-        assert call["dst_path"] == project
-        assert call["answers_file"] == Path(ANSWERS_FILE)
         assert call["overwrite"] is True
         assert call["conflict"] == "inline"
         assert call["unsafe"] is True
@@ -302,48 +304,54 @@ class TestUpdate:
         assert call["defaults"] is False
         assert repaired == [project]
 
-    def test_official_flag_matches_default(self, project, worker, repaired):
+    def test_official_flag_matches_default(self, project, updated, repaired):
         write_answers(project, PUBLISHED)
         result = runner.invoke(main.app, ["update", str(project), "--official"])
         assert result.exit_code == 0, result.output
-        assert worker.calls[0]["src_path"] is None
+        assert updated.calls[0]["vcs_ref"] is None
 
-    def test_local(self, project, local_checkout, worker, repaired):
-        path = write_answers(project, PUBLISHED)
-        original = path.read_text(encoding="utf-8")
-        result = runner.invoke(main.app, ["update", str(project), "--local"])
+    def test_defaults(self, project, updated, repaired):
+        write_answers(project, PUBLISHED)
+        result = runner.invoke(main.app, ["update", str(project), "--defaults"])
         assert result.exit_code == 0, result.output
-        assert worker.calls[0]["src_path"] == str(local_checkout.resolve())
-        assert worker.calls[0]["vcs_ref"] == "HEAD"
-        assert path.read_text(encoding="utf-8") == original
-        assert repaired == [project]
+        assert updated.calls[0]["defaults"] is True
 
-    def test_local_restores_answers_on_error(
-        self, project, local_checkout, worker, repaired
+    def test_local_points_answers_at_checkout(
+        self, git_project, local_checkout, updated, repaired
     ):
-        path = write_answers(project, PUBLISHED)
+        result = runner.invoke(main.app, ["update", str(git_project), "--local"])
+        assert result.exit_code == 0, result.output
+        call = updated.calls[0]
+        assert call["answers"]["_src_path"] == str(local_checkout.resolve())
+        assert call["vcs_ref"] == "HEAD"
+        assert repaired == [git_project]
+
+    def test_local_leaves_history_and_answers_unchanged(
+        self, git_project, local_checkout, updated, repaired
+    ):
+        path = git_project / ANSWERS_FILE
         original = path.read_text(encoding="utf-8")
-        worker.error = RuntimeError("Destination repository is dirty")
-        result = runner.invoke(main.app, ["update", str(project), "--local"])
+        before = head(git_project)
+        result = runner.invoke(main.app, ["update", str(git_project), "--local"])
+        assert result.exit_code == 0, result.output
+        assert head(git_project) == before
+        assert path.read_text(encoding="utf-8") == original
+        assert porcelain(git_project) == ""
+
+    def test_local_restores_on_error(
+        self, git_project, local_checkout, updated, repaired
+    ):
+        path = git_project / ANSWERS_FILE
+        original = path.read_text(encoding="utf-8")
+        before = head(git_project)
+        updated.error.append(RuntimeError("Destination repository is dirty"))
+        result = runner.invoke(main.app, ["update", str(git_project), "--local"])
         assert result.exit_code == 1
         assert "Destination repository is dirty" in result.output
+        assert head(git_project) == before
         assert path.read_text(encoding="utf-8") == original
+        assert porcelain(git_project) == ""
         assert repaired == []
-
-    def test_local_does_not_touch_answers_before_update(
-        self, project, local_checkout, monkeypatch, repaired
-    ):
-        path = write_answers(project, PUBLISHED)
-        original = path.read_text(encoding="utf-8")
-        seen: list[str] = []
-
-        def fake_run_update(cwd, template, defaults):
-            seen.append(path.read_text(encoding="utf-8"))
-
-        monkeypatch.setattr(main, "run_update", fake_run_update)
-        result = runner.invoke(main.app, ["update", str(project), "--local"])
-        assert result.exit_code == 0, result.output
-        assert seen == [original]
 
 
 class TestExample:

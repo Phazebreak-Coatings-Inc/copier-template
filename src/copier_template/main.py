@@ -7,7 +7,6 @@ import copier
 import tomlkit
 import typer
 import yaml
-from copier._main import Worker
 from pydantic import BeforeValidator
 from typer import Typer
 
@@ -148,19 +147,25 @@ def init(
     repair(dest)
 
 
-def run_update(cwd: Path, template: Path | None, defaults: bool = False) -> None:
-    with Worker(
-        src_path=str(template) if template else None,
-        dst_path=cwd,
-        answers_file=Path(ANSWERS_FILE),
-        vcs_ref="HEAD" if template else None,
-        overwrite=True,
-        conflict="inline",
-        unsafe=True,
-        skip_tasks=True,
-        defaults=defaults,
-    ) as worker:
-        worker.run_update()
+@contextmanager
+def local_source(cwd: Path, template: Path):
+    path = cwd / ANSWERS_FILE
+    original = path.read_text(encoding="utf-8")
+    head = sh("git rev-parse HEAD", cwd=cwd, silent=True).stdout.strip()
+    set_answers(cwd, _src_path=str(template))
+    try:
+        sh(
+            "git -c user.name=copier-template -c user.email=copier-template@localhost "
+            "-c commit.gpgsign=false commit --no-verify -q "
+            f'-m "Temporary local template source" -- {ANSWERS_FILE}',
+            cwd=cwd,
+            silent=True,
+        )
+        yield
+    finally:
+        sh(f"git update-ref HEAD {head}", cwd=cwd, silent=True, check=False)
+        sh(f"git restore --staged -- {ANSWERS_FILE}", cwd=cwd, silent=True, check=False)
+        path.write_text(original, encoding="utf-8")
 
 
 @app.command(help="Update your existing project.")
@@ -171,8 +176,17 @@ def update(
     defaults: DefaultsOption = False,
 ):
     template = local_template() if local else None
-    with restored_answers(cwd, template) if template else nullcontext():
-        run_update(cwd, template, defaults)
+    with local_source(cwd, template) if template else nullcontext():
+        copier.run_update(
+            str(cwd),
+            answers_file=ANSWERS_FILE,
+            vcs_ref="HEAD" if template else None,
+            overwrite=True,
+            conflict="inline",
+            unsafe=True,
+            skip_tasks=True,
+            defaults=defaults,
+        )
     repair(cwd)
 
 
