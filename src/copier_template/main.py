@@ -65,9 +65,11 @@ def local_template() -> Path:
 
 def set_answers(cwd: Path, **values: str) -> None:
     path = cwd / ANSWERS_FILE
-    answers = yaml.safe_load(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    header = "".join(f"{line}\n" for line in text.splitlines() if line.startswith("#"))
+    answers = yaml.safe_load(text)
     answers.update(values)
-    path.write_text(yaml.safe_dump(answers, sort_keys=False), encoding="utf-8")
+    path.write_text(header + yaml.safe_dump(answers, sort_keys=False), encoding="utf-8")
 
 
 def latest_tag(template: Path) -> str | None:
@@ -108,6 +110,13 @@ LocalOption = Annotated[
         help="Use the local template checkout, including uncommitted changes, instead of the published release.",
     ),
 ]
+DefaultsOption = Annotated[
+    bool,
+    typer.Option(
+        "--defaults",
+        help="Answer every question with its previous answer or default, without prompting.",
+    ),
+]
 
 app = Typer()
 
@@ -120,7 +129,11 @@ def repair(cwd: CwdArgument = Path(".")):
 
 @app.command(help="Initialize a new project.")
 @cli_exception_handler
-def init(dest: CwdArgument = Path("."), local: LocalOption = False):
+def init(
+    dest: CwdArgument = Path("."),
+    local: LocalOption = False,
+    defaults: DefaultsOption = False,
+):
     template = local_template() if local else None
     pyproject(dest).ensure()
     with restored_answers(dest, template) if template else nullcontext():
@@ -130,11 +143,12 @@ def init(dest: CwdArgument = Path("."), local: LocalOption = False):
             vcs_ref="HEAD" if template else None,
             unsafe=True,
             answers_file=ANSWERS_FILE,
+            defaults=defaults,
         )
     repair(dest)
 
 
-def run_update(cwd: Path, template: Path | None) -> None:
+def run_update(cwd: Path, template: Path | None, defaults: bool = False) -> None:
     with Worker(
         src_path=str(template) if template else None,
         dst_path=cwd,
@@ -144,16 +158,21 @@ def run_update(cwd: Path, template: Path | None) -> None:
         conflict="inline",
         unsafe=True,
         skip_tasks=True,
+        defaults=defaults,
     ) as worker:
         worker.run_update()
 
 
 @app.command(help="Update your existing project.")
 @cli_exception_handler
-def update(cwd: CwdArgument = Path("."), local: LocalOption = False):
+def update(
+    cwd: CwdArgument = Path("."),
+    local: LocalOption = False,
+    defaults: DefaultsOption = False,
+):
     template = local_template() if local else None
     with restored_answers(cwd, template) if template else nullcontext():
-        run_update(cwd, template)
+        run_update(cwd, template, defaults)
     repair(cwd)
 
 

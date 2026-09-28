@@ -162,6 +162,18 @@ class TestSetAnswers:
             "_commit": "v0.1.12",
         }
 
+    def test_keeps_header_comment(self, project):
+        path = project / ANSWERS_FILE
+        path.write_text(
+            "# managed by copier-template, do not edit\n"
+            + yaml.safe_dump(PUBLISHED, sort_keys=False),
+            encoding="utf-8",
+        )
+        main.set_answers(project, _commit="v0.1.12")
+        text = path.read_text(encoding="utf-8")
+        assert text.startswith("# managed by copier-template, do not edit\n")
+        assert read_answers(project)["_commit"] == "v0.1.12"
+
 
 class TestLatestTag:
     def test_returns_nearest_tag(self, tmp_path):
@@ -236,6 +248,7 @@ class TestInit:
         assert copied[0]["src"] == COPIER_REPO
         assert copied[0]["vcs_ref"] is None
         assert copied[0]["answers_file"] == ANSWERS_FILE
+        assert copied[0]["defaults"] is False
         assert repaired == [project]
 
     def test_local(
@@ -260,8 +273,19 @@ class TestInit:
         assert copied == []
         assert repaired == []
 
+    def test_defaults(self, project, ensured, copied, repaired):
+        result = runner.invoke(main.app, ["init", str(project), "--defaults"])
+        assert result.exit_code == 0, result.output
+        assert copied[0]["defaults"] is True
+
 
 class TestUpdate:
+    def test_defaults(self, project, worker, repaired):
+        write_answers(project, PUBLISHED)
+        result = runner.invoke(main.app, ["update", str(project), "--defaults"])
+        assert result.exit_code == 0, result.output
+        assert worker.calls[0]["defaults"] is True
+
     def test_official(self, project, worker, repaired):
         write_answers(project, PUBLISHED)
         result = runner.invoke(main.app, ["update", str(project)])
@@ -275,6 +299,7 @@ class TestUpdate:
         assert call["conflict"] == "inline"
         assert call["unsafe"] is True
         assert call["skip_tasks"] is True
+        assert call["defaults"] is False
         assert repaired == [project]
 
     def test_official_flag_matches_default(self, project, worker, repaired):
@@ -312,7 +337,7 @@ class TestUpdate:
         original = path.read_text(encoding="utf-8")
         seen: list[str] = []
 
-        def fake_run_update(cwd, template):
+        def fake_run_update(cwd, template, defaults):
             seen.append(path.read_text(encoding="utf-8"))
 
         monkeypatch.setattr(main, "run_update", fake_run_update)
