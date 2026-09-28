@@ -11,17 +11,27 @@ First we'll create a uv workspace.
 uv init
 ```
 
-Then we'll use ```uvx``` to create copy the directory from remote.
+Then we'll use ```uvx``` to copy the template into it.
 
 ```sh
-uvx copier-template init 
-
+uvx copier-template init
 ```
+
+```uv init``` creates ```.python-version``` and ```README.md```. The template has its own copies, so copier asks to overwrite them. Answer ```y``` to both.
+
 If you need to update, check:
 
 ```sh
 uvx {{ project_name }} update
 ```
+
+Add ```--defaults``` to reuse your previous answers without prompting. This is needed in CI or any shell without a terminal:
+
+```sh
+uvx {{ project_name }} update --defaults
+```
+
+On ```init```, ```--defaults``` only works for questions that have a default. Questions without one, like ```github_repo```, still need an answer.
 
 
 !!! Warning

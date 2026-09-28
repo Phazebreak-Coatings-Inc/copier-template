@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,20 @@ def write_answers(cwd: Path, answers: dict) -> Path:
 
 def read_answers(cwd: Path) -> dict:
     return yaml.safe_load((cwd / ANSWERS_FILE).read_text(encoding="utf-8"))
+
+
+def git(cwd: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+def git_repo(path: Path) -> None:
+    git(path, "init", "-q", "-b", "main")
+    git(path, "config", "user.email", "test@example.com")
+    git(path, "config", "user.name", "test")
+    git(path, "config", "commit.gpgsign", "false")
+    (path / "file.txt").write_text("x", encoding="utf-8")
+    git(path, "add", "-A")
+    git(path, "commit", "-q", "-m", "init")
 
 
 @pytest.fixture
@@ -137,36 +152,83 @@ class TestLocalTemplate:
             main.local_template()
 
 
-class TestSetSrcPath:
-    def test_only_changes_src_path(self, project):
+class TestSetAnswers:
+    def test_only_changes_given_keys(self, project):
         write_answers(project, PUBLISHED)
-        main.set_src_path(project, "/local")
-        assert read_answers(project) == {**PUBLISHED, "_src_path": "/local"}
+        main.set_answers(project, _src_path="/local", _commit="v0.1.12")
+        assert read_answers(project) == {
+            **PUBLISHED,
+            "_src_path": "/local",
+            "_commit": "v0.1.12",
+        }
+
+    def test_keeps_header_comment(self, project):
+        path = project / ANSWERS_FILE
+        path.write_text(
+            "# managed by copier-template, do not edit\n"
+            + yaml.safe_dump(PUBLISHED, sort_keys=False),
+            encoding="utf-8",
+        )
+        main.set_answers(project, _commit="v0.1.12")
+        text = path.read_text(encoding="utf-8")
+        assert text.startswith("# managed by copier-template, do not edit\n")
+        assert read_answers(project)["_commit"] == "v0.1.12"
+
+
+class TestLatestTag:
+    def test_returns_nearest_tag(self, tmp_path):
+        git_repo(tmp_path)
+        git(tmp_path, "tag", "v1.0.0")
+        (tmp_path / "later.txt").write_text("x", encoding="utf-8")
+        git(tmp_path, "add", "-A")
+        git(tmp_path, "commit", "-q", "-m", "later")
+        assert main.latest_tag(tmp_path) == "v1.0.0"
+
+    def test_untagged_repo(self, tmp_path):
+        git_repo(tmp_path)
+        assert main.latest_tag(tmp_path) is None
+
+    def test_not_a_repo(self, tmp_path):
+        assert main.latest_tag(tmp_path) is None
 
 
 class TestRestoredAnswers:
-    def test_restores_original_text(self, project):
+    def test_restores_original_text(self, project, template):
         path = write_answers(project, PUBLISHED)
         original = path.read_text(encoding="utf-8")
-        with main.restored_answers(project):
+        with main.restored_answers(project, template):
             path.write_text("changed", encoding="utf-8")
         assert path.read_text(encoding="utf-8") == original
 
-    def test_restores_on_error(self, project):
+    def test_restores_on_error(self, project, template):
         path = write_answers(project, PUBLISHED)
         original = path.read_text(encoding="utf-8")
-        with pytest.raises(RuntimeError), main.restored_answers(project):
+        with pytest.raises(RuntimeError), main.restored_answers(project, template):
             path.write_text("changed", encoding="utf-8")
             raise RuntimeError
         assert path.read_text(encoding="utf-8") == original
 
-    def test_new_file_points_at_published_repo(self, project):
-        with main.restored_answers(project):
-            write_answers(project, {**PUBLISHED, "_src_path": "/local"})
+    def test_new_file_points_at_published_tag(self, monkeypatch, project, template):
+        monkeypatch.setattr(main, "latest_tag", lambda t: "v0.1.12")
+        with main.restored_answers(project, template):
+            write_answers(
+                project, {**PUBLISHED, "_src_path": "/local", "_commit": "tmp"}
+            )
         assert read_answers(project)["_src_path"] == COPIER_REPO
+        assert read_answers(project)["_commit"] == "v0.1.12"
 
-    def test_no_file_is_left_alone(self, project):
-        with main.restored_answers(project):
+    def test_new_file_without_tag_warns(self, monkeypatch, project, template, capsys):
+        monkeypatch.setattr(main, "latest_tag", lambda t: None)
+        with main.restored_answers(project, template):
+            write_answers(
+                project, {**PUBLISHED, "_src_path": "/local", "_commit": "tmp"}
+            )
+        assert read_answers(project)["_src_path"] == COPIER_REPO
+        assert read_answers(project)["_commit"] == "tmp"
+        assert "No tag found" in capsys.readouterr().err
+
+    def test_no_file_is_left_alone(self, project, template):
+        with main.restored_answers(project, template):
             pass
         assert not (project / ANSWERS_FILE).exists()
 
@@ -186,14 +248,19 @@ class TestInit:
         assert copied[0]["src"] == COPIER_REPO
         assert copied[0]["vcs_ref"] is None
         assert copied[0]["answers_file"] == ANSWERS_FILE
+        assert copied[0]["defaults"] is False
         assert repaired == [project]
 
-    def test_local(self, project, local_checkout, ensured, copied, repaired):
+    def test_local(
+        self, monkeypatch, project, local_checkout, ensured, copied, repaired
+    ):
+        monkeypatch.setattr(main, "latest_tag", lambda t: "v0.1.12")
         result = runner.invoke(main.app, ["init", str(project), "--local"])
         assert result.exit_code == 0, result.output
         assert copied[0]["src"] == str(local_checkout.resolve())
         assert copied[0]["vcs_ref"] == "HEAD"
         assert read_answers(project)["_src_path"] == COPIER_REPO
+        assert read_answers(project)["_commit"] == "v0.1.12"
         assert repaired == [project]
 
     def test_local_from_installed_package_fails(
@@ -206,8 +273,19 @@ class TestInit:
         assert copied == []
         assert repaired == []
 
+    def test_defaults(self, project, ensured, copied, repaired):
+        result = runner.invoke(main.app, ["init", str(project), "--defaults"])
+        assert result.exit_code == 0, result.output
+        assert copied[0]["defaults"] is True
+
 
 class TestUpdate:
+    def test_defaults(self, project, worker, repaired):
+        write_answers(project, PUBLISHED)
+        result = runner.invoke(main.app, ["update", str(project), "--defaults"])
+        assert result.exit_code == 0, result.output
+        assert worker.calls[0]["defaults"] is True
+
     def test_official(self, project, worker, repaired):
         write_answers(project, PUBLISHED)
         result = runner.invoke(main.app, ["update", str(project)])
@@ -221,6 +299,7 @@ class TestUpdate:
         assert call["conflict"] == "inline"
         assert call["unsafe"] is True
         assert call["skip_tasks"] is True
+        assert call["defaults"] is False
         assert repaired == [project]
 
     def test_official_flag_matches_default(self, project, worker, repaired):
@@ -258,7 +337,7 @@ class TestUpdate:
         original = path.read_text(encoding="utf-8")
         seen: list[str] = []
 
-        def fake_run_update(cwd, template):
+        def fake_run_update(cwd, template, defaults):
             seen.append(path.read_text(encoding="utf-8"))
 
         monkeypatch.setattr(main, "run_update", fake_run_update)
