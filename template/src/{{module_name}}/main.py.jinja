@@ -194,6 +194,9 @@ def update(
 @cli_exception_handler
 def example():  # this command explicitly is not meant to update, it just doesn't work. it's already been tried.... sorry... :(
     root = validate_template_root(Path.cwd().resolve())
+    template_project = pyproject(root).project
+    if template_project is None:
+        raise ValueError(f"No [project] table in {root / 'pyproject.toml'}")
     dst = root / EXAMPLE_NAME
 
     if dst.exists():
@@ -207,7 +210,7 @@ def example():  # this command explicitly is not meant to update, it just doesn'
     pp = pyproject(dst).ensure(EXAMPLE_PROJECT_NAME)
     source = tomlkit.inline_table()
     source.update({"path": "..", "editable": True})
-    pp.table("tool", "uv", "sources")["copier-template"] = source
+    pp.table("tool", "uv", "sources")[template_project.name] = source
     pp.save()
     prepare_pyproject(dst, EXAMPLE_PROJECT_NAME)
     sh("uv build --all-packages", cwd=dst)
