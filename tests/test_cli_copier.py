@@ -1,0 +1,81 @@
+import subprocess
+from pathlib import Path
+
+import pytest
+import yaml
+from typer.testing import CliRunner
+
+from copier_template import main
+from copier_template.config import ANSWERS_FILE
+
+runner = CliRunner()
+
+
+def git(cwd: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+def init_repo(path: Path) -> None:
+    git(path, "init", "-q", "-b", "main")
+    git(path, "config", "user.email", "test@example.com")
+    git(path, "config", "user.name", "test")
+    git(path, "config", "commit.gpgsign", "false")
+
+
+def commit(path: Path, message: str) -> None:
+    git(path, "add", "-A")
+    git(path, "commit", "-q", "-m", message)
+
+
+@pytest.fixture
+def template(tmp_path, monkeypatch):
+    root = tmp_path / "template"
+    (root / "template").mkdir(parents=True)
+    (root / "src" / "copier_template").mkdir(parents=True)
+    (root / "copier.yml").write_text(
+        f"_subdirectory: template\n_answers_file: {ANSWERS_FILE}\n", encoding="utf-8"
+    )
+    (root / "template" / "{{ _copier_conf.answers_file }}.jinja").write_text(
+        "{{ _copier_answers|to_nice_yaml }}", encoding="utf-8"
+    )
+    (root / "template" / "hello.txt").write_text("v1\n", encoding="utf-8")
+    init_repo(root)
+    commit(root, "v1")
+    git(root, "tag", "v0.1.0")
+    monkeypatch.setattr(
+        main, "__file__", str(root / "src" / "copier_template" / "main.py")
+    )
+    monkeypatch.setattr(main, "prepare_pyproject", lambda cwd, *a: None)
+    return root
+
+
+@pytest.fixture
+def published(tmp_path, template):
+    clone = tmp_path / "published"
+    git(tmp_path, "clone", "-q", str(template), str(clone))
+    return clone
+
+
+@pytest.fixture
+def project(tmp_path, published):
+    dst = tmp_path / "project"
+    main.copier.run_copy(
+        str(published), str(dst), unsafe=True, answers_file=ANSWERS_FILE, quiet=True
+    )
+    init_repo(dst)
+    commit(dst, "generated")
+    return dst
+
+
+@pytest.mark.slow
+def test_update_local_uses_uncommitted_template_changes(template, published, project):
+    answers = (project / ANSWERS_FILE).read_text(encoding="utf-8")
+    assert yaml.safe_load(answers)["_src_path"] == str(published)
+    (template / "template" / "hello.txt").write_text("v2\n", encoding="utf-8")
+
+    result = runner.invoke(main.app, ["update", str(project), "--local"])
+
+    assert result.exit_code == 0, result.output
+    assert (project / "hello.txt").read_text(encoding="utf-8") == "v2\n"
+    assert (project / ANSWERS_FILE).read_text(encoding="utf-8") == answers
+    assert yaml.safe_load(answers)["_commit"] == "v0.1.0"

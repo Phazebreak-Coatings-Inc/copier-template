@@ -11,6 +11,7 @@ from pydantic import BeforeValidator
 from typer import Typer
 
 from copier_template.util import PyProject, cli_exception_handler, sh
+from copier._main import Worker
 
 from .config import (
     ANSWERS_FILE,
@@ -118,24 +119,28 @@ def init(dest: CwdArgument = Path("."), local: LocalOption = False):
     repair(dest)
 
 
+
+def run_update(cwd: Path, template: Path | None) -> None:
+    with Worker(
+        src_path=str(template) if template else None,
+        dst_path=cwd,
+        answers_file=Path(ANSWERS_FILE),
+        vcs_ref="HEAD" if template else None,
+        overwrite=True,
+        conflict="inline",
+        unsafe=True,
+        skip_tasks=True,
+    ) as worker:
+        worker.run_update()
+
+
 @app.command(help="Update your existing project.")
 @cli_exception_handler
 def update(cwd: CwdArgument = Path("."), local: LocalOption = False):
     template = local_template() if local else None
     with restored_answers(cwd) if template else nullcontext():
-        if template:
-            set_src_path(cwd, str(template))
-        copier.run_update(
-            str(cwd),
-            answers_file=ANSWERS_FILE,
-            vcs_ref="HEAD" if template else None,
-            overwrite=True,
-            conflict="inline",
-            unsafe=True,
-            skip_tasks=True,
-        )
+        run_update(cwd, template)
     repair(cwd)
-
 
 @app.command(help="Destroy and regenerate the committed example project.", hidden=True)
 @cli_exception_handler
