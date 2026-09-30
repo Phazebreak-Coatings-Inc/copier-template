@@ -185,17 +185,27 @@ def update(
 ):
     template = local_template() if local else None
     with local_source(cwd, template) if template else nullcontext():
-        copier.run_update(
-            str(cwd),
-            answers_file=ANSWERS_FILE,
-            vcs_ref="HEAD" if template else None,
-            overwrite=not override,
-            conflict="inline",
-            unsafe=True,
-            skip_tasks=True,
-            defaults=defaults,
-        )
-    repair(cwd)
+        if override:
+            copier.run_recopy(
+                str(cwd),
+                answers_file=ANSWERS_FILE,
+                vcs_ref="HEAD" if template else None,
+                overwrite=True,
+                unsafe=True,
+                skip_tasks=True,
+                defaults=defaults,
+            )
+        else:
+            copier.run_update(
+                str(cwd),
+                answers_file=ANSWERS_FILE,
+                vcs_ref="HEAD" if template else None,
+                overwrite=True,
+                conflict="inline",
+                unsafe=True,
+                skip_tasks=True,
+                defaults=defaults,
+            )
 
 
 @app.command(help="Destroy and regenerate the committed example project.", hidden=True)
