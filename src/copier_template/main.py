@@ -116,6 +116,14 @@ DefaultsOption = Annotated[
         help="Answer every question with its previous answer or default, without prompting.",
     ),
 ]
+OverrideOption = Annotated[
+    bool,
+    typer.Option(
+        "-o"
+        "--override",
+        help="Override changes rather than leaving conflicts inline"
+    )
+]
 
 app = Typer()
 
@@ -174,6 +182,7 @@ def update(
     cwd: CwdArgument = Path("."),
     local: LocalOption = False,
     defaults: DefaultsOption = False,
+    override: OverrideOption = False,
 ):
     template = local_template() if local else None
     with local_source(cwd, template) if template else nullcontext():
@@ -181,7 +190,7 @@ def update(
             str(cwd),
             answers_file=ANSWERS_FILE,
             vcs_ref="HEAD" if template else None,
-            overwrite=True,
+            overwrite=not override,
             conflict="inline",
             unsafe=True,
             skip_tasks=True,
