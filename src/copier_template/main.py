@@ -119,8 +119,7 @@ DefaultsOption = Annotated[
 OverrideOption = Annotated[
     bool,
     typer.Option(
-        "-o"
-        "--override",
+        "--override/--inline",
         help="Override changes rather than leaving conflicts inline"
     )
 ]
