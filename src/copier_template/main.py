@@ -120,8 +120,8 @@ OverrideOption = Annotated[
     bool,
     typer.Option(
         "--override/--inline",
-        help="Override changes rather than leaving conflicts inline"
-    )
+        help="Override changes rather than leaving conflicts inline",
+    ),
 ]
 
 app = Typer()
